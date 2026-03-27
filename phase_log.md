@@ -1,4 +1,4 @@
-# Phase 102 — Central Config System
+# Phase 103 — Logging + Tracing Layer
 ## Phase Log
 
 **Status:** ✅ Complete
@@ -10,11 +10,12 @@
 
 ## Log
 
-### 2026-03-27 14:00 — Plan written
-- Layered config design: defaults → TOML → .env → env vars
+### 2026-03-27 14:10 — Plan written
+- Dual output logging: JSON lines file + console
 
-### 2026-03-27 16:31 — Build complete
-- Settings dataclass with 11 fields, zero external deps
-- config show + config validate CLI subcommands
-- ~/.cos/ created as default storage dir
-- Singleton pattern: from cos.core.config import settings
+### 2026-03-27 16:33 — Build complete
+- get_logger() factory with singleton root setup
+- Console: HH:MM:SS LEVEL module: message [trace] ($cost)
+- File: JSON lines with 6 structured fields
+- Daily rotation, 30 day retention
+- Zero external deps
