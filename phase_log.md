@@ -26,3 +26,10 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - Phase-specific docs moved from root to `docs/phases/{NNN}_*.md`
 - Root `implementation.md` restored as COS project overview (no longer overwritten by phases)
 - Root `phase_log.md` created as project-level change log (this file)
+
+### 2026-03-27 16:45 — Cost tracking added (Phase 104)
+- `cos/core/cost.py` — CostTracker with SQLite backend
+- First DB table: `cost_events` in `~/.cos/cos.db`
+- MODEL_PRICING lookup for Haiku/Sonnet/Opus
+- CLI: `python -m cos cost summary/reset`
+- Phase History table updated
