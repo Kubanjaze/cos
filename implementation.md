@@ -47,3 +47,4 @@ See `phases/ROADMAP_COS.md` for the full 120-phase roadmap (101–220).
 | 102 | Central config system | ✅ Complete |
 | 103 | Logging + tracing layer | ✅ Complete |
 | 104 | Token + cost tracking middleware | ✅ Complete |
+| 105 | File ingestion service (PDF, CSV, TXT) | ✅ Complete |

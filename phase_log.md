@@ -33,3 +33,11 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - MODEL_PRICING lookup for Haiku/Sonnet/Opus
 - CLI: `python -m cos cost summary/reset`
 - Phase History table updated
+
+### 2026-03-27 16:57 — File ingestion service added (Phase 105)
+- `cos/core/ingestion.py` — content-addressable storage with SHA-256 dedup
+- Second DB table: `artifacts` (indexed on hash + investigation_id)
+- File handlers: TXT, CSV (→markdown), PDF (optional pdfplumber), MD, JSON
+- CLI: `python -m cos ingest <file>` + `python -m cos artifacts`
+- Storage: `~/.cos/artifacts/{hash}.txt`
+- Gate 1 progress: 3/5 (ingest ✅, normalize ✅, store ✅, tag pending, retrieve pending)
