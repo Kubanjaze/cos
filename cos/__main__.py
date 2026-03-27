@@ -27,6 +27,13 @@ def main():
     config_sub.add_parser("show", help="Show current configuration")
     config_sub.add_parser("validate", help="Validate configuration")
 
+    ingest_parser = sub.add_parser("ingest", help="Ingest a file into COS")
+    ingest_parser.add_argument("file", help="Path to file (PDF, CSV, TXT)")
+    ingest_parser.add_argument("--investigation", default="default", help="Investigation ID")
+
+    artifacts_parser = sub.add_parser("artifacts", help="List ingested artifacts")
+    artifacts_parser.add_argument("--investigation", default=None, help="Filter by investigation")
+
     cost_parser = sub.add_parser("cost", help="Cost tracking")
     cost_sub = cost_parser.add_subparsers(dest="cost_command")
     cost_sub.add_parser("summary", help="Show cost summary")
@@ -34,7 +41,30 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command == "cost":
+    if args.command == "ingest":
+        from cos.core.ingestion import ingest_file
+        try:
+            artifact = ingest_file(args.file, investigation_id=args.investigation)
+            print(f"Ingested: {artifact.uri}")
+            print(f"  ID:     {artifact.id}")
+            print(f"  Type:   {artifact.type}")
+            print(f"  Hash:   {artifact.hash[:16]}...")
+            print(f"  Size:   {artifact.size_bytes} bytes")
+            print(f"  Stored: {artifact.stored_path}")
+        except Exception as e:
+            print(f"Error: {e}")
+
+    elif args.command == "artifacts":
+        from cos.core.ingestion import list_artifacts
+        artifacts = list_artifacts(args.investigation)
+        if not artifacts:
+            print("No artifacts found.")
+        else:
+            print(f"{'ID':>8} {'Type':>4} {'Size':>8} {'Investigation':>15} {'Hash':>14} Created")
+            for a in artifacts:
+                print(f"{a['id'][:8]:>8} {a['type']:>4} {a['size_bytes']:>8} {a['investigation_id']:>15} {a['hash']:>14} {a['created_at']}")
+
+    elif args.command == "cost":
         from cos.core.cost import cost_tracker
         if args.cost_command == "summary":
             s = cost_tracker.get_summary()
