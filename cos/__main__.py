@@ -27,9 +27,36 @@ def main():
     config_sub.add_parser("show", help="Show current configuration")
     config_sub.add_parser("validate", help="Validate configuration")
 
+    cost_parser = sub.add_parser("cost", help="Cost tracking")
+    cost_sub = cost_parser.add_subparsers(dest="cost_command")
+    cost_sub.add_parser("summary", help="Show cost summary")
+    cost_sub.add_parser("reset", help="Clear all cost events")
+
     args = parser.parse_args()
 
-    if args.command == "config":
+    if args.command == "cost":
+        from cos.core.cost import cost_tracker
+        if args.cost_command == "summary":
+            s = cost_tracker.get_summary()
+            print(f"COS Cost Summary")
+            print(f"{'='*45}")
+            print(f"Total cost:   ${s['total_cost']:.4f}")
+            print(f"Total events: {s['total_events']}")
+            if s["by_model"]:
+                print(f"\nBy model:")
+                for m in s["by_model"]:
+                    print(f"  {m['model']:35s} {m['events']:3d} calls  ${m['cost']:.4f}")
+            if s["by_investigation"]:
+                print(f"\nBy investigation:")
+                for inv in s["by_investigation"]:
+                    print(f"  {inv['investigation_id']:35s} {inv['events']:3d} calls  ${inv['cost']:.4f}")
+        elif args.cost_command == "reset":
+            cost_tracker.reset()
+            print("Cost events cleared.")
+        else:
+            cost_parser.print_help()
+
+    elif args.command == "config":
         from cos.core.config import settings
         if args.config_command == "show":
             print(settings.show())
