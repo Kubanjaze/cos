@@ -22,9 +22,29 @@ def main():
     sub.add_parser("status", help="Show system status")
     sub.add_parser("info", help="Show package info")
 
+    config_parser = sub.add_parser("config", help="Configuration management")
+    config_sub = config_parser.add_subparsers(dest="config_command")
+    config_sub.add_parser("show", help="Show current configuration")
+    config_sub.add_parser("validate", help="Validate configuration")
+
     args = parser.parse_args()
 
-    if args.command == "status":
+    if args.command == "config":
+        from cos.core.config import settings
+        if args.config_command == "show":
+            print(settings.show())
+        elif args.config_command == "validate":
+            errors = settings.validate()
+            if errors:
+                print("Configuration errors:")
+                for e in errors:
+                    print(f"  - {e}")
+            else:
+                print("Configuration valid.")
+        else:
+            config_parser.print_help()
+
+    elif args.command == "status":
         print(f"COS v{__version__}")
         print("Packages:")
         for pkg in ["core", "memory", "reasoning", "workflow", "decision", "interface", "intelligence", "autonomy"]:
