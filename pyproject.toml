@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cos"
+version = "0.1.0"
+description = "Cognitive Operating System — structured memory, reasoning, and decision engine"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "Kerwyn Medrano"}]
+
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[tool.setuptools.packages.find]
+include = ["cos*"]
