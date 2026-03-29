@@ -96,6 +96,11 @@ def main():
     status_p.add_argument("task_id", help="Task ID (full or partial)")
     task_sub.add_parser("run", help="Process pending tasks")
 
+    cache_parser = sub.add_parser("cache", help="Cache management")
+    cache_sub = cache_parser.add_subparsers(dest="cache_command")
+    cache_sub.add_parser("stats", help="Show cache statistics")
+    cache_sub.add_parser("clear", help="Clear all cache entries")
+
     cost_parser = sub.add_parser("cost", help="Cost tracking")
     cost_sub = cost_parser.add_subparsers(dest="cost_command")
     cost_sub.add_parser("summary", help="Show cost summary")
@@ -325,6 +330,20 @@ def main():
             print(f"Processed {n} tasks.")
         else:
             task_parser.print_help()
+
+    elif args.command == "cache":
+        from cos.core.cache import cache_manager
+        if args.cache_command == "stats":
+            s = cache_manager.stats()
+            print(f"COS Cache Stats")
+            print(f"  Active entries: {s['active_entries']}")
+            print(f"  Expired entries: {s['expired_entries']}")
+            print(f"  Total hits: {s['total_hits']}")
+        elif args.cache_command == "clear":
+            n = cache_manager.clear()
+            print(f"Cache cleared: {n} entries removed.")
+        else:
+            cache_parser.print_help()
 
     elif args.command == "cost":
         from cos.core.cost import cost_tracker
