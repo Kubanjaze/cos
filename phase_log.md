@@ -115,3 +115,9 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - All references in CLAUDE.md updated to new paths
 - COS project is now self-contained: code + docs + roadmap + ADRs
 - Project version: 0.1.6 → 0.1.7
+
+### 2026-03-29 16:57 — Event system added (Phase 116)
+- `cos/core/events.py` — pub-sub EventBus, error isolation per listener
+- on/off/emit/list_events; 5/5 tests passed
+- Foundation for reactive workflows (Phase 168)
+- Project version: 0.1.7 → 0.1.8
