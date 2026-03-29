@@ -1,6 +1,6 @@
 # COS — Cognitive Operating System: Implementation Overview
 
-**Version:** 0.7.0 | **Date:** 2026-03-29
+**Version:** 0.0.8 | **Date:** 2026-03-29
 
 ## What is COS?
 A unified system that ingests information, constructs structured memory, reasons across it, and produces decisions + executable workflows — without manual orchestration.

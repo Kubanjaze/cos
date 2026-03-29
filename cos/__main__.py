@@ -48,6 +48,8 @@ def main():
     search_parser.add_argument("--tag", help="Filter by tag")
     search_parser.add_argument("--source", help="Filter by source")
 
+    sub.add_parser("storage", help="Show storage backend info")
+
     task_parser = sub.add_parser("task", help="Task queue management")
     task_sub = task_parser.add_subparsers(dest="task_command")
     submit_p = task_sub.add_parser("submit", help="Submit a task")
@@ -113,6 +115,22 @@ def main():
                 for key, vals in a.get("tags", {}).items():
                     print(f"           {key}: {', '.join(vals)}")
                 print()
+
+    elif args.command == "storage":
+        from cos.core.storage import storage
+        info = storage.info()
+        print(f"COS Storage Info")
+        print(f"{'='*45}")
+        print(f"Files:")
+        print(f"  Backend:  {info['file_backend']}")
+        print(f"  Base dir: {info['file_base']}")
+        print(f"  Files:    {info['file_count']}")
+        print(f"  Size:     {info['file_size_bytes']:,} bytes")
+        print(f"\nDatabase:")
+        print(f"  Backend:  {info['db_backend']}")
+        print(f"  Path:     {info['db_path']}")
+        print(f"  Size:     {info['db_size_bytes']:,} bytes")
+        print(f"  Tables:   {', '.join(info['db_tables'])}")
 
     elif args.command == "task":
         from cos.core.tasks import task_queue
