@@ -29,6 +29,8 @@ def main():
     config_sub.add_parser("show", help="Show current configuration")
     config_sub.add_parser("validate", help="Validate configuration")
 
+    sub.add_parser("events", help="List registered event types + listeners")
+
     inv_parser = sub.add_parser("investigate", help="Investigation management")
     inv_sub = inv_parser.add_subparsers(dest="inv_command")
     inv_create_p = inv_sub.add_parser("create", help="Create investigation")
@@ -143,6 +145,17 @@ def main():
                 for key, vals in a.get("tags", {}).items():
                     print(f"           {key}: {', '.join(vals)}")
                 print()
+
+    elif args.command == "events":
+        from cos.core.events import event_bus
+        events = event_bus.list_events()
+        print(f"COS Event Bus ({event_bus.total_listeners} listeners, {event_bus.total_emits} emits)")
+        print("=" * 40)
+        if not events:
+            print("No event listeners registered.")
+        else:
+            for etype, count in events.items():
+                print(f"  {etype:30s} {count} listener(s)")
 
     elif args.command == "investigate":
         from cos.core.investigations import investigation_manager

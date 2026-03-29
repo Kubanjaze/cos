@@ -1,40 +1,49 @@
 # Phase 116 — Event System (Trigger-Based Execution)
 
-**Version:** 1.0 | **Tier:** Standard | **Date:** 2026-03-29
+**Version:** 1.1 | **Tier:** Standard | **Date:** 2026-03-29
 
 ## Goal
-Build an event system that allows COS components to emit events and register listeners that react to them. Events like "artifact_ingested", "investigation_created", "pipeline_completed" can trigger follow-up actions without tight coupling between modules.
+Publish-subscribe event bus for loose coupling between COS components. Events like "artifact.ingested" can trigger follow-up actions without tight coupling.
 
-CLI: `python -m cos events list` (show registered event types + listeners)
+CLI: `python -m cos events`
 
-Outputs: Event bus in `cos/core/events.py`
+Outputs: `cos/core/events.py` — EventBus singleton
 
 ## Logic
-1. Create `cos/core/events.py` with `EventBus` class
-2. `emit(event_type, payload)` — fires an event to all registered listeners
-3. `on(event_type, callback)` — registers a listener for an event type
-4. `off(event_type, callback)` — unregisters a listener
-5. Event types: strings like "artifact.ingested", "investigation.created", "pipeline.completed"
-6. Payloads: dicts with event-specific data (artifact_id, investigation_id, etc.)
-7. All events logged with structured fields (Phase 103)
-8. Synchronous dispatch for v0 (listeners called inline)
+1. `EventBus` class: `on(type, callback)`, `off(type, callback)`, `emit(type, payload)`
+2. Synchronous dispatch: listeners called inline in registration order
+3. Error isolation: each listener wrapped in try/except — failure doesn't break chain
+4. Structured logging on every emit + register/unregister
+5. `list_events()` returns type → listener count map
+6. `total_emits` and `total_listeners` properties for stats
 
 ## Key Concepts
-- **Publish-subscribe pattern**: emitters don't know about listeners, loose coupling
-- **Event types as dotted strings**: "artifact.ingested", "cost.warning", "pipeline.step.completed"
-- **Synchronous dispatch**: listeners called in registration order, inline (no async for v0)
-- **Structured logging**: every event emission logged with type + payload summary
-- **Integration hooks**: Phase 105 ingestion could emit "artifact.ingested" → Phase 106 auto-tag
+- **Pub-sub pattern**: emitters don't know about listeners, decoupled modules
+- **Dotted event types**: "artifact.ingested", "pipeline.completed", "cost.warning"
+- **Error isolation**: bad listeners caught and logged, don't break other listeners
+- **Synchronous for v0**: no async — acceptable for local-first (ADR-001)
+- **Foundation for Phase 168**: event-triggered workflows will use this bus
 
 ## Verification Checklist
-- [ ] `on("test.event", callback)` registers listener
-- [ ] `emit("test.event", {"key": "value"})` triggers callback with payload
-- [ ] Multiple listeners on same event all fire
-- [ ] `off()` unregisters listener
-- [ ] Events logged with structured fields
-- [ ] `python -m cos events list` shows registered types
+- [x] `on()` registers listener, confirmed via emit callback
+- [x] `emit()` fires to all registered listeners (2 listeners both called)
+- [x] `off()` removes listener (1 listener remaining after removal)
+- [x] Error in listener caught — doesn't break event chain
+- [x] `list_events()` returns correct type → count mapping
+- [x] CLI shows registered events (empty at startup — listeners register at runtime)
 
-## Risks
-- Listener exceptions could break event chain — wrap each listener in try/except
-- Event storms: one event triggering another that triggers the first — no cycle detection in v0
-- Memory leaks: listeners hold references — acceptable for local-first single-process (ADR-001)
+## Risks (resolved)
+- Listener exceptions: wrapped in try/except per listener
+- Event storms/cycles: no detection in v0 — acceptable for current module count
+- Memory leaks from listener references: acceptable for single-process (ADR-001)
+
+## Results
+| Metric | Value |
+|--------|-------|
+| Tests | 5/5 (register, emit, multi, off, error handling) |
+| Total emits in test | 4 |
+| Error handling | Listener ValueError caught, logged, didn't break chain |
+| External deps | 0 |
+| Cost | $0.00 |
+
+Key finding: Error isolation per listener is critical — one bad listener must not break the event chain. The try/except per callback ensures system resilience. This event bus is the foundation for reactive workflows (Phase 168).
