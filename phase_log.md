@@ -133,3 +133,9 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - Seventh DB table: `cache`
 - CLI: cache stats + cache clear
 - Project version: 0.1.9 → 0.2.0 (minor rollover)
+
+### 2026-03-29 17:08 — Rate limiter added (Phase 119)
+- `cos/core/ratelimit.py` — token bucket, per-API defaults
+- @rate_limited decorator, get_limiter() registry
+- CLI: ratelimit stats
+- Project version: 0.2.0 → 0.2.1
