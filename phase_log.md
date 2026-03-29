@@ -121,3 +121,9 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - on/off/emit/list_events; 5/5 tests passed
 - Foundation for reactive workflows (Phase 168)
 - Project version: 0.1.7 → 0.1.8
+
+### 2026-03-29 17:01 — Batch engine added (Phase 117)
+- `cos/core/batch.py` — generic BatchExecutor with fail-continue mode
+- Progress events via event bus, error capping at 100
+- CLI: batch ingest <dir>
+- Project version: 0.1.8 → 0.1.9

@@ -1,6 +1,6 @@
 # COS — Cognitive Operating System: Implementation Overview
 
-**Version:** 0.1.8 | **Date:** 2026-03-29
+**Version:** 0.1.9 | **Date:** 2026-03-29
 
 ## What is COS?
 A unified system that ingests information, constructs structured memory, reasons across it, and produces decisions + executable workflows — without manual orchestration.
@@ -60,3 +60,4 @@ See `docs/ROADMAP_COS_ARCHITECT_NOTES.md` for architecture decisions and ADRs.
 | 114 | Pipeline registry (list + run workflows) | ✅ Complete — **GATE 2 COMPLETE** |
 | 115 | State manager (track investigations) | ✅ Complete |
 | 116 | Event system (trigger-based execution) | ✅ Complete |
+| 117 | Batch execution engine | ✅ Complete |
