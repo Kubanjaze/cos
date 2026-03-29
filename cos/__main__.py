@@ -50,6 +50,11 @@ def main():
 
     sub.add_parser("storage", help="Show storage backend info")
 
+    version_parser = sub.add_parser("version", help="Version management")
+    version_sub = version_parser.add_subparsers(dest="version_command")
+    vlist_p = version_sub.add_parser("list", help="List versions for an investigation")
+    vlist_p.add_argument("investigation_id", help="Investigation ID")
+
     task_parser = sub.add_parser("task", help="Task queue management")
     task_sub = task_parser.add_subparsers(dest="task_command")
     submit_p = task_sub.add_parser("submit", help="Submit a task")
@@ -115,6 +120,20 @@ def main():
                 for key, vals in a.get("tags", {}).items():
                     print(f"           {key}: {', '.join(vals)}")
                 print()
+
+    elif args.command == "version":
+        from cos.core.versioning import version_manager
+        if args.version_command == "list":
+            versions = version_manager.get_versions(args.investigation_id)
+            if not versions:
+                print(f"No versions for investigation '{args.investigation_id}'.")
+            else:
+                print(f"Versions for '{args.investigation_id}':")
+                for v in versions:
+                    art = v.artifact_id[:8] + "..." if v.artifact_id else "—"
+                    print(f"  v{v.version_number}  {v.created_at}  artifact={art}  {v.description}")
+        else:
+            version_parser.print_help()
 
     elif args.command == "storage":
         from cos.core.storage import storage
