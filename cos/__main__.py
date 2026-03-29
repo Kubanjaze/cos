@@ -96,6 +96,7 @@ def main():
     status_p.add_argument("task_id", help="Task ID (full or partial)")
     task_sub.add_parser("run", help="Process pending tasks")
 
+    sub.add_parser("health", help="System health dashboard")
     sub.add_parser("ratelimit", help="Rate limiter stats")
 
     cache_parser = sub.add_parser("cache", help="Cache management")
@@ -332,6 +333,11 @@ def main():
             print(f"Processed {n} tasks.")
         else:
             task_parser.print_help()
+
+    elif args.command == "health":
+        from cos.core.health import get_health_report, format_health_report
+        report = get_health_report()
+        print(format_health_report(report))
 
     elif args.command == "ratelimit":
         from cos.core.ratelimit import all_stats
