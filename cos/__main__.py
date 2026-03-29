@@ -29,6 +29,20 @@ def main():
     config_sub.add_parser("show", help="Show current configuration")
     config_sub.add_parser("validate", help="Validate configuration")
 
+    inv_parser = sub.add_parser("investigate", help="Investigation management")
+    inv_sub = inv_parser.add_subparsers(dest="inv_command")
+    inv_create_p = inv_sub.add_parser("create", help="Create investigation")
+    inv_create_p.add_argument("title", help="Investigation question/title")
+    inv_create_p.add_argument("--domain", default="")
+    inv_create_p.add_argument("--tags", default="")
+    inv_sub.add_parser("list", help="List investigations")
+    inv_show_p = inv_sub.add_parser("show", help="Show investigation detail")
+    inv_show_p.add_argument("inv_id", help="Investigation ID")
+    inv_activate_p = inv_sub.add_parser("activate", help="Activate investigation")
+    inv_activate_p.add_argument("inv_id")
+    inv_complete_p = inv_sub.add_parser("complete", help="Complete investigation")
+    inv_complete_p.add_argument("inv_id")
+
     sub.add_parser("plugins", help="List registered plugins")
 
     pipe_parser = sub.add_parser("pipeline", help="Pipeline management")
@@ -129,6 +143,43 @@ def main():
                 for key, vals in a.get("tags", {}).items():
                     print(f"           {key}: {', '.join(vals)}")
                 print()
+
+    elif args.command == "investigate":
+        from cos.core.investigations import investigation_manager
+        if args.inv_command == "create":
+            inv_id = investigation_manager.create(args.title, domain=args.domain, tags=args.tags)
+            print(f"Investigation created: {inv_id}")
+        elif args.inv_command == "list":
+            invs = investigation_manager.list_investigations()
+            if not invs:
+                print("No investigations.")
+            else:
+                print(f"{'ID':>14} {'Status':>10} {'Domain':>15} {'Created':>20} Title")
+                for i in invs:
+                    print(f"{i['id']:>14} {i['status']:>10} {i['domain']:>15} {i['created_at']:>20} {i['title'][:40]}")
+        elif args.inv_command == "show":
+            detail = investigation_manager.get(args.inv_id)
+            if not detail:
+                print(f"Not found: {args.inv_id}")
+            else:
+                print(f"Investigation: {detail['id']}")
+                print(f"  Title:      {detail['title']}")
+                print(f"  Domain:     {detail['domain'] or '—'}")
+                print(f"  Status:     {detail['status']}")
+                print(f"  Created:    {detail['created_at']}")
+                print(f"  Updated:    {detail['updated_at']}")
+                print(f"  Tags:       {detail['tags'] or '—'}")
+                print(f"  Artifacts:  {detail['artifacts']}")
+                print(f"  Versions:   {detail['versions']}")
+                print(f"  Cost:       ${detail['total_cost']:.4f}")
+        elif args.inv_command == "activate":
+            investigation_manager.activate(args.inv_id)
+            print(f"Investigation {args.inv_id} activated.")
+        elif args.inv_command == "complete":
+            investigation_manager.complete(args.inv_id)
+            print(f"Investigation {args.inv_id} completed.")
+        else:
+            inv_parser.print_help()
 
     elif args.command == "pipeline":
         from cos.core.pipelines import pipeline_registry
