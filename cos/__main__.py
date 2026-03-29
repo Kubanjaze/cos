@@ -34,6 +34,18 @@ def main():
     artifacts_parser = sub.add_parser("artifacts", help="List ingested artifacts")
     artifacts_parser.add_argument("--investigation", default=None, help="Filter by investigation")
 
+    tag_parser = sub.add_parser("tag", help="Tag an artifact with metadata")
+    tag_parser.add_argument("artifact_id", help="Artifact ID (full or partial)")
+    tag_parser.add_argument("--domain", help="Domain (e.g., cheminformatics, clinical)")
+    tag_parser.add_argument("--source", help="Data source")
+    tag_parser.add_argument("--tags", help="Comma-separated tags")
+    tag_parser.add_argument("--description", help="Description")
+
+    search_parser = sub.add_parser("search", help="Search artifacts by metadata")
+    search_parser.add_argument("--domain", help="Filter by domain")
+    search_parser.add_argument("--tag", help="Filter by tag")
+    search_parser.add_argument("--source", help="Filter by source")
+
     cost_parser = sub.add_parser("cost", help="Cost tracking")
     cost_sub = cost_parser.add_subparsers(dest="cost_command")
     cost_sub.add_parser("summary", help="Show cost summary")
@@ -63,6 +75,32 @@ def main():
             print(f"{'ID':>8} {'Type':>4} {'Size':>8} {'Investigation':>15} {'Hash':>14} Created")
             for a in artifacts:
                 print(f"{a['id'][:8]:>8} {a['type']:>4} {a['size_bytes']:>8} {a['investigation_id']:>15} {a['hash']:>14} {a['created_at']}")
+
+    elif args.command == "tag":
+        from cos.core.tagging import tag_artifact, get_tags
+        try:
+            tag_list = [t.strip() for t in args.tags.split(",")] if args.tags else None
+            count = tag_artifact(args.artifact_id, domain=args.domain, source=args.source,
+                                 tags=tag_list, description=args.description)
+            print(f"Added {count} tags to artifact {args.artifact_id}")
+            all_tags = get_tags(args.artifact_id)
+            for key, vals in all_tags.items():
+                print(f"  {key}: {', '.join(vals)}")
+        except Exception as e:
+            print(f"Error: {e}")
+
+    elif args.command == "search":
+        from cos.core.tagging import search_artifacts
+        results = search_artifacts(domain=args.domain, tag=args.tag, source=args.source)
+        if not results:
+            print("No matching artifacts found.")
+        else:
+            print(f"Found {len(results)} artifact(s):\n")
+            for a in results:
+                print(f"  {a['id'][:8]}  {a['type']:>4}  {a['size_bytes']:>6}B  {a['investigation_id']:>12}  {a['created_at']}")
+                for key, vals in a.get("tags", {}).items():
+                    print(f"           {key}: {', '.join(vals)}")
+                print()
 
     elif args.command == "cost":
         from cos.core.cost import cost_tracker
