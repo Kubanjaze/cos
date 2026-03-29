@@ -69,3 +69,9 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - CLI: `python -m cos version list <investigation_id>`
 - Audit trail: timestamp + description on every version stamp
 - Project version: 0.0.9 → 0.1.0 (patch rollover)
+
+### 2026-03-29 16:40 — Command registry added (Phase 110)
+- `cos/core/cli_registry.py` — dual CLI/programmatic invocation
+- 7 command groups registered, all 11 CLI commands verified
+- `registry.run("info", {})` returns output as string — foundation for workflow chaining
+- Project version: 0.1.0 → 0.1.1
