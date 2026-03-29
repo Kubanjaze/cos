@@ -31,6 +31,13 @@ def main():
 
     sub.add_parser("plugins", help="List registered plugins")
 
+    pipe_parser = sub.add_parser("pipeline", help="Pipeline management")
+    pipe_sub = pipe_parser.add_subparsers(dest="pipeline_command")
+    pipe_sub.add_parser("list", help="List pipelines")
+    pipe_run_p = pipe_sub.add_parser("run", help="Run a pipeline")
+    pipe_run_p.add_argument("pipeline_name", help="Pipeline name")
+    pipe_run_p.add_argument("--investigation", default="default")
+
     ingest_parser = sub.add_parser("ingest", help="Ingest a file into COS")
     ingest_parser.add_argument("file", help="Path to file (PDF, CSV, TXT)")
     ingest_parser.add_argument("--investigation", default="default", help="Investigation ID")
@@ -122,6 +129,29 @@ def main():
                 for key, vals in a.get("tags", {}).items():
                     print(f"           {key}: {', '.join(vals)}")
                 print()
+
+    elif args.command == "pipeline":
+        from cos.core.pipelines import pipeline_registry
+        if args.pipeline_command == "list":
+            pipelines = pipeline_registry.list_pipelines()
+            if not pipelines:
+                print("No pipelines registered.")
+            else:
+                print(f"Registered pipelines:")
+                for p in pipelines:
+                    print(f"  {p['name']:20s} ({p['steps']} steps) — {p['description']}")
+        elif args.pipeline_command == "run":
+            import json
+            result = pipeline_registry.run(args.pipeline_name, investigation_id=args.investigation)
+            print(f"\nPipeline: {result['pipeline']} — {result['status']}")
+            for step in result["steps"]:
+                status = "OK" if step["status"] == "completed" else "FAIL"
+                cmd = step["command"] + (f" {step.get('subcommand','')}" if step.get("subcommand") else "")
+                print(f"  Step {step['step']}: {cmd:20s} [{status}] {step['duration_s']:.3f}s")
+            if result.get("total_duration_s"):
+                print(f"\nTotal: {result['total_duration_s']:.3f}s")
+        else:
+            pipe_parser.print_help()
 
     elif args.command == "plugins":
         from cos.core.plugins import plugin_registry
