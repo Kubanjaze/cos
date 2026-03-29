@@ -49,3 +49,9 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - Partial artifact ID resolution (8-char prefix)
 - **GATE 1 COMPLETE**: ingest → normalize → store → tag → retrieve by metadata — all verified
 - Phase History + completion gates updated
+
+### 2026-03-29 16:22 — Task queue added (Phase 107)
+- `cos/core/tasks.py` — SQLite-backed task queue, sequential worker
+- Fourth DB table: `tasks` (indexed on status + investigation_id)
+- CLI: `python -m cos task {submit,list,status,run}`
+- Result capture: stdout + stderr + exit code in ~/.cos/tasks/

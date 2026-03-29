@@ -49,3 +49,4 @@ See `phases/ROADMAP_COS.md` for the full 120-phase roadmap (101–220).
 | 104 | Token + cost tracking middleware | ✅ Complete |
 | 105 | File ingestion service (PDF, CSV, TXT) | ✅ Complete |
 | 106 | Metadata tagging system | ✅ Complete — **GATE 1 COMPLETE** |
+| 107 | Async task queue (background jobs) | ✅ Complete |
