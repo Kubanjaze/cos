@@ -147,3 +147,10 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - **TRACK A COMPLETE: 20/20 phases (101-120)**
 - COS core infrastructure fully operational
 - Project version: 0.2.1 → 0.2.2
+
+### 2026-03-29 17:16 — Document store added (Phase 121, Track B begins)
+- `cos/memory/documents.py` — first memory module
+- DB tables 8-9: `documents` + `document_chunks`
+- Paragraph-based chunking (max 500 chars)
+- CLI: docs {list,show,store,search}
+- Project version: 0.2.2 → 0.2.3

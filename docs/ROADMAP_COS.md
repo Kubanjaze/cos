@@ -61,7 +61,7 @@
 
 | # | Phase | Tier | Opens |
 |---|---|---|---|
-| 121 | Document store (raw + parsed text) | Micro | Can we persist sources? |
+| 121 | ✅ | Document store (raw + parsed text) | Micro | Can we persist sources? |
 | 122 | Embedding pipeline (chunking + indexing) | Standard | Can we retrieve effectively? |
 | 123 | Structured entity extraction | Standard | Can we move beyond text? |
 | 124 | Relationship extractor (entity links) | Standard | Can we form graphs? |
