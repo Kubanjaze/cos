@@ -7,6 +7,8 @@ if sys.platform == "win32":
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 import argparse
+import os
+from pathlib import Path
 from cos import __version__
 
 
@@ -45,6 +47,16 @@ def main():
     search_parser.add_argument("--domain", help="Filter by domain")
     search_parser.add_argument("--tag", help="Filter by tag")
     search_parser.add_argument("--source", help="Filter by source")
+
+    task_parser = sub.add_parser("task", help="Task queue management")
+    task_sub = task_parser.add_subparsers(dest="task_command")
+    submit_p = task_sub.add_parser("submit", help="Submit a task")
+    submit_p.add_argument("task_cmd", help="Command to run (e.g., 'cos info')")
+    submit_p.add_argument("--investigation", default="default")
+    task_sub.add_parser("list", help="List tasks")
+    status_p = task_sub.add_parser("status", help="Get task status")
+    status_p.add_argument("task_id", help="Task ID (full or partial)")
+    task_sub.add_parser("run", help="Process pending tasks")
 
     cost_parser = sub.add_parser("cost", help="Cost tracking")
     cost_sub = cost_parser.add_subparsers(dest="cost_command")
@@ -101,6 +113,41 @@ def main():
                 for key, vals in a.get("tags", {}).items():
                     print(f"           {key}: {', '.join(vals)}")
                 print()
+
+    elif args.command == "task":
+        from cos.core.tasks import task_queue
+        if args.task_command == "submit":
+            tid = task_queue.submit(args.task_cmd, investigation_id=args.investigation)
+            print(f"Task submitted: {tid[:8]}...")
+        elif args.task_command == "list":
+            tasks = task_queue.list_tasks()
+            if not tasks:
+                print("No tasks.")
+            else:
+                print(f"{'ID':>8} {'Status':>10} {'Investigation':>14} {'Submitted':>20} Command")
+                for t in tasks:
+                    print(f"{t.id[:8]:>8} {t.status:>10} {t.investigation_id:>14} {t.submitted_at:>20} {t.command[:40]}")
+        elif args.task_command == "status":
+            t = task_queue.get_status(args.task_id)
+            if not t:
+                print(f"Task not found: {args.task_id}")
+            else:
+                print(f"Task: {t.id}")
+                print(f"Status: {t.status}")
+                print(f"Command: {t.command}")
+                print(f"Investigation: {t.investigation_id}")
+                print(f"Submitted: {t.submitted_at}")
+                print(f"Started: {t.started_at or '—'}")
+                print(f"Completed: {t.completed_at or '—'}")
+                if t.error:
+                    print(f"Error: {t.error[:200]}")
+                if t.result_path and os.path.exists(t.result_path):
+                    print(f"\nResult:\n{Path(t.result_path).read_text(encoding='utf-8')[:500]}")
+        elif args.task_command == "run":
+            n = task_queue.run_worker()
+            print(f"Processed {n} tasks.")
+        else:
+            task_parser.print_help()
 
     elif args.command == "cost":
         from cos.core.cost import cost_tracker
