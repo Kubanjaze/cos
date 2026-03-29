@@ -81,3 +81,9 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - TransientError retried, PermanentError fails fast
 - classify_http_error maps HTTP status → error type
 - Project version: 0.1.1 → 0.1.2
+
+### 2026-03-29 16:42 — Input validation added (Phase 112)
+- `cos/core/validation.py` — 5 validators (file_path, smiles, investigation_id, not_empty, positive_number)
+- RDKit-optional SMILES validation with char-set fallback
+- 8/8 tests passed
+- Project version: 0.1.2 → 0.1.3

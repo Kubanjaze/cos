@@ -1,6 +1,6 @@
 # COS — Cognitive Operating System: Implementation Overview
 
-**Version:** 0.1.2 | **Date:** 2026-03-29
+**Version:** 0.1.3 | **Date:** 2026-03-29
 
 ## What is COS?
 A unified system that ingests information, constructs structured memory, reasons across it, and produces decisions + executable workflows — without manual orchestration.
@@ -54,3 +54,4 @@ See `phases/ROADMAP_COS.md` for the full 120-phase roadmap (101–220).
 | 109 | Versioning system for outputs + runs | ✅ Complete |
 | 110 | CLI → service transition (command registry) | ✅ Complete |
 | 111 | Error handling + retry system | ✅ Complete |
+| 112 | Input validation layer | ✅ Complete |
