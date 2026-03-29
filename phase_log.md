@@ -101,3 +101,17 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - Version stamp on pipeline completion via Phase 109
 - **GATE 2 COMPLETE**: register + run pipeline → version outputs → show logs
 - Project version: 0.1.4 → 0.1.5
+
+### 2026-03-29 16:52 — Investigation manager added (Phase 115)
+- `cos/core/investigations.py` — ADR-003 lifecycle manager
+- Sixth DB table: `investigations` (human-readable IDs: inv-{8hex})
+- CLI: investigate create/list/show/activate/complete
+- Cross-table aggregation: artifacts + versions + cost per investigation
+- Project version: 0.1.5 → 0.1.6
+
+### 2026-03-29 16:55 — Roadmap docs moved to COS project
+- `ROADMAP_COS.md` → `cos/docs/ROADMAP_COS.md`
+- `ROADMAP_COS_ARCHITECT_NOTES.md` → `cos/docs/ROADMAP_COS_ARCHITECT_NOTES.md`
+- All references in CLAUDE.md updated to new paths
+- COS project is now self-contained: code + docs + roadmap + ADRs
+- Project version: 0.1.6 → 0.1.7
