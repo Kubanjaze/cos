@@ -1,40 +1,49 @@
 # Phase 121 — Document Store (Raw + Parsed Text)
 
-**Version:** 1.0 | **Tier:** Micro | **Date:** 2026-03-29
+**Version:** 1.1 | **Tier:** Micro | **Date:** 2026-03-29
 
 ## Goal
-Build a document store in the memory package that persists both raw and parsed text for ingested documents. Extends Phase 105 artifacts with chunked text storage — the foundation for embedding and retrieval (Phase 122). First module in `cos/memory/`.
+Persistent document store with paragraph-based chunking. Extends artifacts with structured text storage — foundation for embedding and retrieval. First `cos/memory/` module.
 
-CLI: `python -m cos docs list [--investigation <id>]` / `python -m cos docs show <doc_id>`
+CLI: `python -m cos docs {list,show,store,search}`
 
-Outputs: Document records in SQLite `documents` table, text chunks in `document_chunks` table
+Outputs: `documents` + `document_chunks` tables in SQLite
 
 ## Logic
-1. Create `cos/memory/documents.py` with `DocumentStore` class
-2. `documents` table: id, artifact_id, title, source_path, content_text, char_count, chunk_count, investigation_id, created_at
-3. `document_chunks` table: id, document_id, chunk_index, chunk_text, char_count
-4. `store_document(artifact_id, investigation_id)` — loads artifact text, splits into chunks, stores both
-5. Chunking: split by paragraph (double newline), merge small paragraphs up to max_chunk_size (500 chars)
-6. `get_document(doc_id)` — returns document metadata + chunk count
-7. `get_chunks(doc_id)` — returns all chunks for a document
-8. `search_text(query, investigation_id)` — basic substring search across chunks
+1. `store_document(artifact_id)` loads artifact text, chunks by paragraph (max 500 chars), stores both
+2. `documents` table: metadata (id, artifact_id, title, char_count, chunk_count)
+3. `document_chunks` table: ordered text segments (id, document_id, chunk_index, chunk_text)
+4. `search_text(query)` does substring search across chunks with JOIN to documents
+5. Paragraph-based chunking: split on `\n\n`, merge small paragraphs up to max_size
 
 ## Key Concepts
-- **Document = artifact + parsed text + chunks**: extends Phase 105 artifacts with structured text
-- **Chunking strategy**: paragraph-based with merge — balances granularity vs context
+- **Document = artifact + structured text**: extends Phase 105 with chunked storage
+- **Paragraph chunking**: split on double newline, merge small, hard-split oversized
 - **Two tables**: documents (metadata) + document_chunks (text segments)
-- **Track B foundation**: documents are the input to embeddings (Phase 122) and entity extraction (Phase 123)
-- **Artifact linkage**: every document references an artifact_id from Phase 105
+- **Substring search**: basic LIKE query across chunks — semantic search in Phase 122
+- **Track B foundation**: chunks are the input to embeddings (Phase 122)
 
 ## Verification Checklist
-- [ ] `store_document()` creates document from artifact
-- [ ] Chunks created with paragraph-based splitting
-- [ ] `get_document()` returns metadata + chunk count
-- [ ] `get_chunks()` returns ordered chunks
-- [ ] `search_text("KRAS")` finds matching chunks
-- [ ] CLI: `docs list` and `docs show <id>` work
+- [x] `store_document()` creates doc from compounds.csv artifact: 7 chunks, 3289 chars
+- [x] Chunks created at ~500 char max with paragraph boundaries
+- [x] `get_document()` returns metadata with chunk count
+- [x] `get_chunks()` returns ordered chunks
+- [x] `search_text("benz_004")` finds matching chunk
+- [x] CLI: docs list, docs show, docs store, docs search all work
 
-## Risks
-- Chunk size balance: too small = lost context, too large = poor retrieval — 500 chars is a reasonable start
-- Large documents: chunking is O(n) in text length — acceptable for v0
-- Duplicate documents: artifact dedup (Phase 105) prevents duplicate ingestion
+## Risks (resolved)
+- Chunk size balance: 500 chars is reasonable for markdown tables
+- Large documents: O(n) chunking, acceptable at v0 scale
+- Duplicate docs prevented by artifact-level dedup (Phase 105)
+
+## Results
+| Metric | Value |
+|--------|-------|
+| Test document | compounds.csv → 7 chunks, 3289 chars |
+| Search test | "benz_004" found in chunk 0 |
+| DB tables added | documents + document_chunks (tables 8-9) |
+| First memory module | cos/memory/documents.py |
+| External deps | 0 |
+| Cost | $0.00 |
+
+Key finding: Paragraph-based chunking on markdown tables produces ~500 char chunks that contain 5-7 compound rows each — good granularity for retrieval. The search_text substring query is basic but functional until semantic search (Phase 122) is built.

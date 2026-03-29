@@ -97,6 +97,17 @@ def main():
     task_sub.add_parser("run", help="Process pending tasks")
 
     sub.add_parser("health", help="System health dashboard")
+
+    docs_parser = sub.add_parser("docs", help="Document store")
+    docs_sub = docs_parser.add_subparsers(dest="docs_command")
+    docs_sub.add_parser("list", help="List documents")
+    docs_show_p = docs_sub.add_parser("show", help="Show document detail")
+    docs_show_p.add_argument("doc_id")
+    docs_store_p = docs_sub.add_parser("store", help="Store document from artifact")
+    docs_store_p.add_argument("artifact_id")
+    docs_store_p.add_argument("--investigation", default="default")
+    docs_search_p = docs_sub.add_parser("search", help="Search document text")
+    docs_search_p.add_argument("query")
     sub.add_parser("ratelimit", help="Rate limiter stats")
 
     cache_parser = sub.add_parser("cache", help="Cache management")
@@ -333,6 +344,45 @@ def main():
             print(f"Processed {n} tasks.")
         else:
             task_parser.print_help()
+
+    elif args.command == "docs":
+        from cos.memory.documents import document_store
+        if args.docs_command == "list":
+            docs = document_store.list_documents()
+            if not docs:
+                print("No documents stored.")
+            else:
+                print(f"{'ID':>12} {'Title':>15} {'Chunks':>6} {'Chars':>8} {'Investigation':>14} Created")
+                for d in docs:
+                    print(f"{d.id:>12} {d.title[:15]:>15} {d.chunk_count:>6} {d.char_count:>8} {d.investigation_id:>14} {d.created_at}")
+        elif args.docs_command == "show":
+            doc = document_store.get_document(args.doc_id)
+            if not doc:
+                print(f"Not found: {args.doc_id}")
+            else:
+                print(f"Document: {doc.id}")
+                print(f"  Title:    {doc.title}")
+                print(f"  Artifact: {doc.artifact_id[:12]}...")
+                print(f"  Chars:    {doc.char_count}")
+                print(f"  Chunks:   {doc.chunk_count}")
+                chunks = document_store.get_chunks(doc.id)
+                print(f"\nChunks:")
+                for c in chunks[:5]:
+                    print(f"  [{c.chunk_index}] ({c.char_count} chars) {c.chunk_text[:80]}...")
+        elif args.docs_command == "store":
+            doc_id = document_store.store_document(args.artifact_id, investigation_id=args.investigation)
+            doc = document_store.get_document(doc_id)
+            print(f"Document stored: {doc_id} ({doc.chunk_count} chunks, {doc.char_count} chars)")
+        elif args.docs_command == "search":
+            results = document_store.search_text(args.query)
+            if not results:
+                print(f"No results for '{args.query}'")
+            else:
+                print(f"Found {len(results)} result(s) for '{args.query}':")
+                for r in results:
+                    print(f"  [{r['doc_id']}:{r['chunk_index']}] {r['title']} — {r['text'][:80]}...")
+        else:
+            docs_parser.print_help()
 
     elif args.command == "health":
         from cos.core.health import get_health_report, format_health_report
