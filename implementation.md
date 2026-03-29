@@ -1,6 +1,6 @@
 # COS — Cognitive Operating System: Implementation Overview
 
-**Version:** 0.1.4 | **Date:** 2026-03-29
+**Version:** 0.1.5 | **Date:** 2026-03-29
 
 ## What is COS?
 A unified system that ingests information, constructs structured memory, reasons across it, and produces decisions + executable workflows — without manual orchestration.
@@ -36,7 +36,7 @@ See `phases/ROADMAP_COS.md` for the full 120-phase roadmap (101–220).
 
 ## Completion Gates
 - **Gate 1 (~Phase 106):** ingest → normalize → store → tag → retrieve ✅ PASSED
-- **Gate 2 (~Phase 114-116):** register + run pipeline → version outputs → logs
+- **Gate 2 (~Phase 114):** register + run pipeline → version outputs → logs ✅ PASSED
 - **Gate 3 (~Phase 132/146/171):** one investigation → ranked outputs + confidence + cost
 - **Gate 4 (~Phase 205):** minimal UI can browse + rerun + view artifacts
 
@@ -56,3 +56,4 @@ See `phases/ROADMAP_COS.md` for the full 120-phase roadmap (101–220).
 | 111 | Error handling + retry system | ✅ Complete |
 | 112 | Input validation layer | ✅ Complete |
 | 113 | Modular plugin architecture | ✅ Complete |
+| 114 | Pipeline registry (list + run workflows) | ✅ Complete — **GATE 2 COMPLETE** |

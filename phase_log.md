@@ -94,3 +94,10 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - 5 built-in file handlers auto-registered from ingestion module
 - CLI: `python -m cos plugins`
 - Project version: 0.1.3 → 0.1.4
+
+### 2026-03-29 16:49 — Pipeline registry + GATE 2 COMPLETE (Phase 114)
+- `cos/core/pipelines.py` — named multi-step workflows via command registry
+- Built-in "system-check" pipeline: status → config validate → storage (0.032s)
+- Version stamp on pipeline completion via Phase 109
+- **GATE 2 COMPLETE**: register + run pipeline → version outputs → show logs
+- Project version: 0.1.4 → 0.1.5
