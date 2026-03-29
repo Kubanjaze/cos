@@ -62,3 +62,10 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - CLI: `python -m cos storage` shows backend info
 - Cloud migration path: implement S3Storage/PostgresDB, swap in Storage()
 - Project version: 0.0.8 → 0.0.9
+
+### 2026-03-29 16:32 — Versioning system added (Phase 109)
+- `cos/core/versioning.py` — per-investigation version numbering
+- Fifth DB table: `versions` (indexed on investigation_id)
+- CLI: `python -m cos version list <investigation_id>`
+- Audit trail: timestamp + description on every version stamp
+- Project version: 0.0.9 → 0.1.0 (patch rollover)
