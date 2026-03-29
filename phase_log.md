@@ -127,3 +127,9 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - Progress events via event bus, error capping at 100
 - CLI: batch ingest <dir>
 - Project version: 0.1.8 → 0.1.9
+
+### 2026-03-29 17:04 — Cache layer added (Phase 118)
+- `cos/core/cache.py` — TTL expiration + hit counting
+- Seventh DB table: `cache`
+- CLI: cache stats + cache clear
+- Project version: 0.1.9 → 0.2.0 (minor rollover)

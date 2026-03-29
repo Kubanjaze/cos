@@ -49,7 +49,7 @@
 | 115 | ✅ | State manager (track investigations) | Standard | Can we persist ongoing work? |
 | 116 | ✅ | Event system (trigger-based execution) | Standard | Can workflows react to changes? |
 | 117 | ✅ | Batch execution engine | Standard | Can we run large jobs efficiently? |
-| 118 | | Cache layer (prompt + retrieval caching) | Micro | Can we reduce cost? |
+| 118 | ✅ | Cache layer (prompt + retrieval caching) | Micro | Can we reduce cost? |
 | 119 | | Rate limit manager | Micro | Can we safely scale API usage? |
 | 120 | | System health dashboard (internal) | Standard | Can we monitor the system? |
 
