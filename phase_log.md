@@ -87,3 +87,10 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - RDKit-optional SMILES validation with char-set fallback
 - 8/8 tests passed
 - Project version: 0.1.2 → 0.1.3
+
+### 2026-03-29 16:46 — Plugin architecture added (Phase 113)
+- `cos/core/plugins.py` — PluginRegistry + @register_plugin decorator
+- 3 plugin types: file_handler, processor, tool
+- 5 built-in file handlers auto-registered from ingestion module
+- CLI: `python -m cos plugins`
+- Project version: 0.1.3 → 0.1.4
