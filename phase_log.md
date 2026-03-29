@@ -41,3 +41,11 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - CLI: `python -m cos ingest <file>` + `python -m cos artifacts`
 - Storage: `~/.cos/artifacts/{hash}.txt`
 - Gate 1 progress: 3/5 (ingest ✅, normalize ✅, store ✅, tag pending, retrieve pending)
+
+### 2026-03-29 16:17 — Metadata tagging + GATE 1 COMPLETE (Phase 106)
+- `cos/core/tagging.py` — flexible key-value tags on artifacts
+- Third DB table: `artifact_tags` (indexed on key/value + artifact_id)
+- CLI: `python -m cos tag` + `python -m cos search`
+- Partial artifact ID resolution (8-char prefix)
+- **GATE 1 COMPLETE**: ingest → normalize → store → tag → retrieve by metadata — all verified
+- Phase History + completion gates updated

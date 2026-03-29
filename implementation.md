@@ -35,7 +35,7 @@ cos/
 See `phases/ROADMAP_COS.md` for the full 120-phase roadmap (101–220).
 
 ## Completion Gates
-- **Gate 1 (~Phase 105):** ingest → normalize → store → tag → retrieve
+- **Gate 1 (~Phase 106):** ingest → normalize → store → tag → retrieve ✅ PASSED
 - **Gate 2 (~Phase 114-116):** register + run pipeline → version outputs → logs
 - **Gate 3 (~Phase 132/146/171):** one investigation → ranked outputs + confidence + cost
 - **Gate 4 (~Phase 205):** minimal UI can browse + rerun + view artifacts
@@ -48,3 +48,4 @@ See `phases/ROADMAP_COS.md` for the full 120-phase roadmap (101–220).
 | 103 | Logging + tracing layer | ✅ Complete |
 | 104 | Token + cost tracking middleware | ✅ Complete |
 | 105 | File ingestion service (PDF, CSV, TXT) | ✅ Complete |
+| 106 | Metadata tagging system | ✅ Complete — **GATE 1 COMPLETE** |
