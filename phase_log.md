@@ -75,3 +75,9 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - 7 command groups registered, all 11 CLI commands verified
 - `registry.run("info", {})` returns output as string — foundation for workflow chaining
 - Project version: 0.1.0 → 0.1.1
+
+### 2026-03-29 16:38 — Error handling added (Phase 111)
+- `cos/core/errors.py` — COSError hierarchy + @retry + safe_execute
+- TransientError retried, PermanentError fails fast
+- classify_http_error maps HTTP status → error type
+- Project version: 0.1.1 → 0.1.2
