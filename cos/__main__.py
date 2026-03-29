@@ -31,6 +31,12 @@ def main():
 
     sub.add_parser("events", help="List registered event types + listeners")
 
+    batch_parser = sub.add_parser("batch", help="Batch operations")
+    batch_sub = batch_parser.add_subparsers(dest="batch_command")
+    batch_ingest_p = batch_sub.add_parser("ingest", help="Batch ingest files from directory")
+    batch_ingest_p.add_argument("directory", help="Directory with files to ingest")
+    batch_ingest_p.add_argument("--investigation", default="default")
+
     inv_parser = sub.add_parser("investigate", help="Investigation management")
     inv_sub = inv_parser.add_subparsers(dest="inv_command")
     inv_create_p = inv_sub.add_parser("create", help="Create investigation")
@@ -145,6 +151,34 @@ def main():
                 for key, vals in a.get("tags", {}).items():
                     print(f"           {key}: {', '.join(vals)}")
                 print()
+
+    elif args.command == "batch":
+        if args.batch_command == "ingest":
+            from cos.core.batch import batch_executor
+            from cos.core.ingestion import ingest_file, HANDLERS
+            import glob
+            # Find supported files
+            files = []
+            for ext in HANDLERS:
+                files.extend(glob.glob(os.path.join(args.directory, f"*{ext}")))
+            if not files:
+                print(f"No supported files found in {args.directory}")
+            else:
+                result = batch_executor.run(
+                    items=files,
+                    operation=lambda f: ingest_file(f, investigation_id=args.investigation),
+                    investigation_id=args.investigation,
+                    description=f"Batch ingest from {args.directory}",
+                )
+                print(f"\nBatch: {result.description}")
+                print(f"  Total: {result.total} | Succeeded: {result.succeeded} | Failed: {result.failed}")
+                print(f"  Duration: {result.duration_s}s | Rate: {result.items_per_sec} items/s")
+                if result.errors:
+                    print(f"  Errors:")
+                    for e in result.errors[:5]:
+                        print(f"    [{e['index']}] {e['item'][:40]}: {e['error'][:60]}")
+        else:
+            batch_parser.print_help()
 
     elif args.command == "events":
         from cos.core.events import event_bus
