@@ -96,6 +96,8 @@ def main():
     status_p.add_argument("task_id", help="Task ID (full or partial)")
     task_sub.add_parser("run", help="Process pending tasks")
 
+    sub.add_parser("ratelimit", help="Rate limiter stats")
+
     cache_parser = sub.add_parser("cache", help="Cache management")
     cache_sub = cache_parser.add_subparsers(dest="cache_command")
     cache_sub.add_parser("stats", help="Show cache statistics")
@@ -330,6 +332,19 @@ def main():
             print(f"Processed {n} tasks.")
         else:
             task_parser.print_help()
+
+    elif args.command == "ratelimit":
+        from cos.core.ratelimit import all_stats
+        stats = all_stats()
+        if not stats:
+            print("No rate limiters active.")
+        else:
+            print(f"COS Rate Limiters ({len(stats)} active)")
+            print("=" * 50)
+            for name, s in stats.items():
+                print(f"  {name:20s} rate={s['rate']}/s cap={s['capacity']} "
+                      f"reqs={s['total_requests']} waits={s['total_waits']} "
+                      f"wait_time={s['total_wait_time_s']:.3f}s")
 
     elif args.command == "cache":
         from cos.core.cache import cache_manager
