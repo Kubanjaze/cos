@@ -1,40 +1,49 @@
 # Phase 113 — Modular Plugin Architecture
 
-**Version:** 1.0 | **Tier:** Standard | **Date:** 2026-03-29
+**Version:** 1.1 | **Tier:** Standard | **Date:** 2026-03-29
 
 ## Goal
-Build a plugin system that allows new tools, file handlers, and processors to be registered dynamically. External modules can extend COS without modifying core code. This is how the system grows from 8 packages to an ecosystem.
+Plugin system allowing new file handlers, processors, and tools to be registered dynamically. External code can extend COS without modifying core modules.
 
-CLI: `python -m cos plugins list`
+CLI: `python -m cos plugins`
 
-Outputs: Plugin registry in `cos/core/plugins.py`
+Outputs: `cos/core/plugins.py` — PluginRegistry + @register_plugin decorator
 
 ## Logic
-1. Create `cos/core/plugins.py` with `PluginRegistry` class
-2. Plugin types: `file_handler` (new file formats), `processor` (data transformers), `tool` (CLI-accessible tools)
-3. `@register_plugin(type, name)` decorator for auto-registration
-4. `registry.get_handler(extension)` — find a file handler by extension
-5. `registry.get_processor(name)` — find a processor by name
-6. `registry.list_plugins()` — list all registered plugins by type
-7. Built-in plugins: register existing file handlers (TXT, CSV, PDF) as plugins
-8. CLI: `plugins list` shows all registered plugins
+1. `PluginRegistry` with 3 stores: file_handlers (by extension), processors (by name), tools (by name)
+2. `@register_plugin("file_handler", ".xlsx")` decorator for auto-registration
+3. `get_handler/get_processor/get_tool` for lookup
+4. Built-in file handlers from ingestion module auto-registered on import
+5. `list_plugins()` returns all by type; `total_count` property
+6. CLI: `plugins` command shows all registered
 
 ## Key Concepts
-- **Plugin registry pattern**: plugins self-register via decorator at import time
-- **Three plugin types**: file_handler (by extension), processor (by name), tool (by name)
-- **Decorator-based registration**: `@register_plugin("file_handler", ".xlsx")` on a function
-- **Discovery**: import a module → its decorated functions auto-register
-- **Extensibility**: third-party code can add plugins by decorating functions and importing
+- **Self-registration via decorator**: `@register_plugin(type, name)` registers at import time
+- **Three plugin types**: file_handler (extension key), processor (name key), tool (name key)
+- **Built-in auto-registration**: existing HANDLERS from ingestion.py registered as plugins
+- **Overwrite warning**: duplicate name logs WARNING before overwriting
+- **No filesystem scanning**: plugins must be explicitly imported for v0
 
 ## Verification Checklist
-- [ ] Built-in file handlers (TXT, CSV, PDF) registered as plugins
-- [ ] `@register_plugin` decorator works for new handlers
-- [ ] `registry.get_handler(".csv")` returns the CSV handler
-- [ ] `registry.list_plugins()` shows all by type
-- [ ] `python -m cos plugins list` CLI works
-- [ ] Custom plugin registration verified
+- [x] 5 built-in file handlers registered (.txt, .csv, .pdf, .md, .json)
+- [x] `get_handler(".csv")` returns _extract_csv function
+- [x] Custom @register_plugin("processor", "uppercase") works
+- [x] Custom processor callable: "hello" → "HELLO"
+- [x] `list_plugins()` groups by type correctly
+- [x] `python -m cos plugins` CLI shows all plugins
 
-## Risks
-- Import-time side effects: plugins register on import — order may matter
-- Name collisions: later registration overwrites earlier — log a warning
-- Plugin discovery: for v0, plugins must be explicitly imported (no filesystem scanning)
+## Risks (resolved)
+- Import-time side effects: built-ins register in _register_builtins(), called once
+- Name collisions: logged as WARNING before overwrite
+- Discovery: explicit imports only for v0 — filesystem scanning deferred
+
+## Results
+| Metric | Value |
+|--------|-------|
+| Built-in plugins | 5 file handlers |
+| Custom plugin test | processor/uppercase → HELLO |
+| Plugin types | 3 (file_handler, processor, tool) |
+| External deps | 0 |
+| Cost | $0.00 |
+
+Key finding: The decorator pattern makes plugin registration trivially easy — one line above any function. Built-in handlers from Phase 105 auto-register, proving backwards compatibility. The registry is the foundation for Phase 114 (pipeline registry).

@@ -29,6 +29,8 @@ def main():
     config_sub.add_parser("show", help="Show current configuration")
     config_sub.add_parser("validate", help="Validate configuration")
 
+    sub.add_parser("plugins", help="List registered plugins")
+
     ingest_parser = sub.add_parser("ingest", help="Ingest a file into COS")
     ingest_parser.add_argument("file", help="Path to file (PDF, CSV, TXT)")
     ingest_parser.add_argument("--investigation", default="default", help="Investigation ID")
@@ -120,6 +122,16 @@ def main():
                 for key, vals in a.get("tags", {}).items():
                     print(f"           {key}: {', '.join(vals)}")
                 print()
+
+    elif args.command == "plugins":
+        from cos.core.plugins import plugin_registry
+        plugins = plugin_registry.list_plugins()
+        print(f"COS Plugins ({plugin_registry.total_count} total)")
+        print("=" * 40)
+        for ptype, names in plugins.items():
+            print(f"\n{ptype} ({len(names)}):")
+            for n in names:
+                print(f"  {n}")
 
     elif args.command == "version":
         from cos.core.versioning import version_manager
