@@ -1,39 +1,49 @@
 # Phase 111 — Error Handling + Retry System
 
-**Version:** 1.0 | **Tier:** Micro | **Date:** 2026-03-29
+**Version:** 1.1 | **Tier:** Micro | **Date:** 2026-03-29
 
 ## Goal
-Build a centralized error handling and retry system for COS. Provides decorators for automatic retry with exponential backoff, structured error logging, and error categorization (transient vs permanent). All COS modules use this instead of ad-hoc try/except.
+Centralized error handling and retry system. Provides error hierarchy, @retry decorator with exponential backoff, and safe_execute wrapper. All COS modules use this instead of ad-hoc try/except.
 
-CLI: `python -m cos test-retry` (demo/self-test)
+CLI: Self-test via Python (no CLI subcommand — utility module)
 
-Outputs: Error handling utilities in `cos/core/errors.py`
+Outputs: `cos/core/errors.py` — importable error handling utilities
 
 ## Logic
-1. Define error hierarchy: `COSError` base → `TransientError` (retryable) → `PermanentError` (not retryable)
-2. `@retry(max_attempts, backoff_base, retryable_exceptions)` decorator
-3. Exponential backoff: wait = backoff_base * 2^attempt (capped at 60s)
-4. Structured error logging: error type, attempt count, delay, original exception
-5. `safe_execute(fn, *args, default=None)` — run function, return default on failure
-6. All errors logged with investigation_id context when available
+1. Error hierarchy: `COSError` → `TransientError` (retryable) / `PermanentError` (fail fast)
+2. Subclasses: `RateLimitError(TransientError)`, `ValidationError(PermanentError)`
+3. `@retry(max_attempts, backoff_base, max_delay, retryable)` decorator
+4. Backoff: `min(backoff_base * 2^attempt, max_delay)` with structured logging per attempt
+5. `safe_execute(fn, default=None)` — catch-all wrapper
+6. `classify_http_error(status_code)` — maps HTTP codes to error types
 
 ## Key Concepts
-- **Error hierarchy**: COSError → TransientError (retry) vs PermanentError (fail fast)
-- **@retry decorator**: exponential backoff with configurable max_attempts and retryable types
-- **Backoff formula**: `min(backoff_base * 2^attempt, 60)` seconds
-- **safe_execute**: catch-all wrapper returning default on any failure
-- **Structured logging integration**: errors logged with Phase 103 structured fields
-- **API error mapping**: HTTP 429/500/502/503 → TransientError; 400/401/404 → PermanentError
+- **Error hierarchy**: TransientError retried, PermanentError fails immediately
+- **@retry decorator**: exponential backoff, configurable max_attempts/backoff_base
+- **Backoff cap**: 60s default, prevents infinite waits
+- **classify_http_error**: 429→RateLimitError, 500/502/503→TransientError, 400/401/404→PermanentError
+- **safe_execute**: returns default on any exception — for non-critical operations
+- **Structured logging**: retry attempts logged with count + delay
 
 ## Verification Checklist
-- [ ] `@retry` retries TransientError up to max_attempts
-- [ ] `@retry` does NOT retry PermanentError
-- [ ] Exponential backoff delays verified (0.1s → 0.2s → 0.4s...)
-- [ ] `safe_execute` returns default on failure
-- [ ] Error hierarchy: isinstance checks work correctly
-- [ ] Structured error logging includes attempt count
+- [x] @retry retries TransientError up to max_attempts (3 attempts, succeeded on 3rd)
+- [x] @retry does NOT retry PermanentError (failed after 1 attempt)
+- [x] Exponential backoff: 0.05s → 0.10s delays verified
+- [x] safe_execute returns "fallback" on ValueError
+- [x] classify_http_error: 429→RateLimitError, 404→PermanentError
+- [x] Structured error logging includes attempt count
 
-## Risks
-- Retry on non-idempotent operations could cause duplicates — caller must ensure idempotency
-- Backoff cap at 60s may be too short for rate-limited APIs — configurable per call
-- Thread safety of retry state: not an issue for local-first sequential execution (ADR-001)
+## Risks (resolved)
+- Retry on non-idempotent ops: caller's responsibility — documented in docstring
+- Backoff cap: 60s default is configurable per-call via max_delay param
+- PermanentError must not be in retryable tuple: verified — @retry only catches TransientError by default
+
+## Results
+| Metric | Value |
+|--------|-------|
+| Error classes | 5 (COSError, TransientError, PermanentError, RateLimitError, ValidationError) |
+| Tests passed | 5/5 (retry success, retry exhausted, permanent fail-fast, safe_execute, HTTP mapping) |
+| External deps | 0 (stdlib only) |
+| Cost | $0.00 |
+
+Key finding: The decorator pattern keeps retry logic out of business code. `@retry(max_attempts=3)` on any function adds resilience without cluttering the function body. PermanentError correctly bypasses retry — preventing wasted attempts on auth failures or invalid input.
