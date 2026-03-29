@@ -1,6 +1,6 @@
 # COS — Cognitive Operating System: Implementation Overview
 
-**Version:** 0.0.8 | **Date:** 2026-03-29
+**Version:** 0.0.9 | **Date:** 2026-03-29
 
 ## What is COS?
 A unified system that ingests information, constructs structured memory, reasons across it, and produces decisions + executable workflows — without manual orchestration.
@@ -50,3 +50,4 @@ See `phases/ROADMAP_COS.md` for the full 120-phase roadmap (101–220).
 | 105 | File ingestion service (PDF, CSV, TXT) | ✅ Complete |
 | 106 | Metadata tagging system | ✅ Complete — **GATE 1 COMPLETE** |
 | 107 | Async task queue (background jobs) | ✅ Complete |
+| 108 | Storage abstraction (local → cloud-ready) | ✅ Complete |

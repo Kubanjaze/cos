@@ -55,3 +55,10 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - Fourth DB table: `tasks` (indexed on status + investigation_id)
 - CLI: `python -m cos task {submit,list,status,run}`
 - Result capture: stdout + stderr + exit code in ~/.cos/tasks/
+
+### 2026-03-29 16:30 — Storage abstraction added (Phase 108)
+- `cos/core/storage.py` — Protocol pattern for file + database ops
+- LocalFileStorage + SQLiteDatabase behind swappable interfaces
+- CLI: `python -m cos storage` shows backend info
+- Cloud migration path: implement S3Storage/PostgresDB, swap in Storage()
+- Project version: 0.0.8 → 0.0.9
