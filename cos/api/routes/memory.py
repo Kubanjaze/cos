@@ -22,10 +22,10 @@ def list_concepts(domain: Optional[str] = None):
              "domain": c.domain, "category": c.category, "confidence": c.confidence} for c in concepts]
 
 
-@router.get("/graph/{entity_name}")
-def get_graph(entity_name: str, depth: int = 1):
+@router.get("/graph/stats")
+def graph_stats():
     from cos.memory.graph import knowledge_graph
-    return knowledge_graph.subgraph(entity_name, depth=depth)
+    return knowledge_graph.stats()
 
 
 @router.get("/graph/neighbors/{entity_name}")
@@ -34,10 +34,10 @@ def get_neighbors(entity_name: str):
     return knowledge_graph.neighbors(entity_name)
 
 
-@router.get("/graph/stats")
-def graph_stats():
+@router.get("/graph/{entity_name}")
+def get_graph(entity_name: str, depth: int = 1):
     from cos.memory.graph import knowledge_graph
-    return knowledge_graph.stats()
+    return knowledge_graph.subgraph(entity_name, depth=depth)
 
 
 @router.get("/search")
