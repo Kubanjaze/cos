@@ -252,6 +252,80 @@ def main():
     conf_res_p.add_argument("resolution")
     conf_sub.add_parser("stats", help="Conflict statistics")
 
+    scores_parser = sub.add_parser("scores", help="Memory scoring")
+    scores_sub = scores_parser.add_subparsers(dest="scores_command")
+    scores_all_p = scores_sub.add_parser("score-all", help="Score all items of a type")
+    scores_all_p.add_argument("target_type", help="entity, concept, relation, episode")
+    scores_top_p = scores_sub.add_parser("top", help="Top-scored items")
+    scores_top_p.add_argument("--type", default=None)
+    scores_top_p.add_argument("--limit", type=int, default=10)
+    scores_sub.add_parser("stats", help="Scoring statistics")
+
+    prune_parser = sub.add_parser("prune", help="Memory pruning")
+    prune_sub = prune_parser.add_subparsers(dest="prune_command")
+    prune_ep_p = prune_sub.add_parser("episodes", help="Prune old episodes")
+    prune_ep_p.add_argument("--max-age-days", type=int, default=30)
+    prune_sub.add_parser("cache", help="Prune expired cache")
+    prune_dry_p = prune_sub.add_parser("dry-run", help="Preview pruning")
+    prune_dry_p.add_argument("target_type")
+    prune_dry_p.add_argument("threshold", type=float)
+    prune_sub.add_parser("stats", help="Pruning statistics")
+
+    xlink_parser = sub.add_parser("crosslinks", help="Cross-domain linking")
+    xlink_sub = xlink_parser.add_subparsers(dest="xlink_command")
+    xlink_sub.add_parser("discover", help="Auto-discover cross-domain links")
+    xlink_list_p = xlink_sub.add_parser("list", help="List links")
+    xlink_list_p.add_argument("--domain", default=None)
+    xlink_sub.add_parser("stats", help="Cross-link statistics")
+
+    hybrid_parser = sub.add_parser("hybrid", help="Hybrid search")
+    hybrid_sub = hybrid_parser.add_subparsers(dest="hybrid_command")
+    hybrid_search_p = hybrid_sub.add_parser("search", help="Hybrid search query")
+    hybrid_search_p.add_argument("query")
+    hybrid_search_p.add_argument("--top-k", type=int, default=10)
+    hybrid_sub.add_parser("stats", help="Hybrid engine statistics")
+
+    snap_parser = sub.add_parser("snapshot", help="Memory snapshots")
+    snap_sub = snap_parser.add_subparsers(dest="snap_command")
+    snap_create_p = snap_sub.add_parser("create", help="Create snapshot")
+    snap_create_p.add_argument("name")
+    snap_create_p.add_argument("--description", default="")
+    snap_create_p.add_argument("--investigation", default="default")
+    snap_sub.add_parser("list", help="List snapshots")
+    snap_show_p = snap_sub.add_parser("show", help="Show snapshot detail")
+    snap_show_p.add_argument("snapshot_id")
+    snap_sub.add_parser("stats", help="Snapshot statistics")
+
+    changes_parser = sub.add_parser("changes", help="Incremental updates")
+    changes_sub = changes_parser.add_subparsers(dest="changes_command")
+    changes_sub.add_parser("pending", help="List pending changes")
+    changes_sub.add_parser("apply", help="Apply pending changes")
+    changes_sub.add_parser("stats", help="Change statistics")
+
+    fetch_parser = sub.add_parser("connectors", help="External connectors")
+    fetch_sub = fetch_parser.add_subparsers(dest="fetch_command")
+    fetch_sub.add_parser("list", help="List connectors")
+    fetch_run_p = fetch_sub.add_parser("fetch", help="Fetch from connector")
+    fetch_run_p.add_argument("connector")
+    fetch_run_p.add_argument("query")
+    fetch_sub.add_parser("stats", help="Connector statistics")
+
+    gaps_parser = sub.add_parser("gaps", help="Knowledge gap detection")
+    gaps_sub = gaps_parser.add_subparsers(dest="gaps_command")
+    gaps_sub.add_parser("detect", help="Detect all gaps")
+    gaps_sub.add_parser("summary", help="Gap summary")
+
+    viz_parser = sub.add_parser("viz", help="Memory visualization")
+    viz_sub = viz_parser.add_subparsers(dest="viz_command")
+    viz_tree_p = viz_sub.add_parser("tree", help="ASCII tree of entity neighborhood")
+    viz_tree_p.add_argument("entity")
+    viz_tree_p.add_argument("--depth", type=int, default=1)
+    viz_sub.add_parser("map", help="Memory map overview")
+    viz_sub.add_parser("clusters", help="Domain clusters")
+    viz_export_p = viz_sub.add_parser("export", help="Export graph as JSON")
+    viz_export_p.add_argument("--output", default=None, help="Output file path")
+    viz_sub.add_parser("stats", help="Visualization statistics")
+
     sub.add_parser("health", help="System health dashboard")
 
     docs_parser = sub.add_parser("docs", help="Document store")
@@ -948,6 +1022,228 @@ def main():
                     print(f"  {st}: {cnt}")
         else:
             conf_parser.print_help()
+
+    elif args.command == "scores":
+        from cos.memory.scoring import memory_scorer
+        if args.scores_command == "score-all":
+            n = memory_scorer.score_all(args.target_type)
+            print(f"Scored {n} {args.target_type} items")
+        elif args.scores_command == "top":
+            top = memory_scorer.get_top(target_type=args.type, limit=args.limit)
+            if not top:
+                print("No scores found.")
+            else:
+                print(f"{'Type':>10} {'ID':>14} {'Composite':>10} {'Relevance':>10} {'Confidence':>10} {'Freq':>5}")
+                for s in top:
+                    print(f"{s.target_type:>10} {s.target_id[:14]:>14} {s.composite_score:>10.4f} {s.relevance:>10.2f} {s.confidence:>10.2f} {s.frequency:>5}")
+        elif args.scores_command == "stats":
+            s = memory_scorer.stats()
+            print(f"Memory Scores: {s['total']} items, avg={s['avg_score']:.4f}")
+            for t, info in s["by_type"].items():
+                print(f"  {t}: {info['count']} items, avg={info['avg_score']:.4f}")
+        else:
+            scores_parser.print_help()
+
+    elif args.command == "prune":
+        from cos.memory.pruning import memory_pruner
+        if args.prune_command == "episodes":
+            n = memory_pruner.prune_episodes(max_age_days=args.max_age_days)
+            print(f"Pruned {n} episodes")
+        elif args.prune_command == "cache":
+            n = memory_pruner.prune_stale_cache()
+            print(f"Pruned {n} expired cache entries")
+        elif args.prune_command == "dry-run":
+            items = memory_pruner.dry_run(args.target_type, args.threshold)
+            if not items:
+                print(f"No {args.target_type} items below threshold {args.threshold}")
+            else:
+                print(f"Would prune {len(items)} {args.target_type} items:")
+                for item in items[:10]:
+                    print(f"  {item['id'][:16]} score={item['score']:.4f}")
+        elif args.prune_command == "stats":
+            s = memory_pruner.prune_stats()
+            print(f"Pruning candidates:")
+            print(f"  Expired cache: {s['expired_cache']}")
+            print(f"  Total scored: {s['total_scored']}")
+            if s["low_score_candidates"]:
+                print(f"  Low-score (<0.3):")
+                for t, c in s["low_score_candidates"].items():
+                    print(f"    {t}: {c}")
+        else:
+            prune_parser.print_help()
+
+    elif args.command == "crosslinks":
+        from cos.memory.crossdomain import cross_linker
+        if args.xlink_command == "discover":
+            n = cross_linker.discover_links()
+            print(f"Discovered {n} cross-domain links")
+        elif args.xlink_command == "list":
+            links = cross_linker.get_links(domain=args.domain)
+            if not links:
+                print("No cross-domain links found.")
+            else:
+                for l in links:
+                    print(f"  {l.source_domain}/{l.source_id[:12]} --[{l.link_type}]--> {l.target_domain}/{l.target_id[:12]} (conf={l.confidence:.2f})")
+        elif args.xlink_command == "stats":
+            s = cross_linker.stats()
+            print(f"Cross-links: {s['total']} total")
+            if s["domains_linked"]:
+                print(f"  Domains: {', '.join(s['domains_linked'])}")
+            for t, c in s["by_type"].items():
+                print(f"  {t}: {c}")
+        else:
+            xlink_parser.print_help()
+
+    elif args.command == "hybrid":
+        from cos.memory.hybrid_query import hybrid_engine
+        if args.hybrid_command == "search":
+            results = hybrid_engine.search(args.query, top_k=args.top_k)
+            if not results:
+                print(f"No results for '{args.query}'")
+            else:
+                print(f"Hybrid search: '{args.query}' ({len(results)} results)\n")
+                for i, r in enumerate(results, 1):
+                    sources = "+".join(r["sources"])
+                    print(f"  {i}. [{r['type']:>8}] {r['name'][:25]:>25} score={r['fused_score']:.4f} ({sources})")
+                    if r.get("text"):
+                        print(f"     {r['text'][:70]}")
+        elif args.hybrid_command == "stats":
+            s = hybrid_engine.stats()
+            print(f"Hybrid Query Engine:")
+            print(f"  Concepts:   {s['searchable_concepts']}")
+            print(f"  Chunks:     {s['searchable_chunks']}")
+            print(f"  Entities:   {s['searchable_entities']}")
+            print(f"  Relations:  {s['searchable_relations']}")
+            print(f"  Embeddings: {s['vector_embeddings']}")
+            print(f"  Weights:    vector={s['weights']['vector']}, keyword={s['weights']['keyword']}, graph={s['weights']['graph']}")
+        else:
+            hybrid_parser.print_help()
+
+    elif args.command == "snapshot":
+        from cos.memory.snapshots import snapshot_manager
+        if args.snap_command == "create":
+            sid = snapshot_manager.create(args.name, description=args.description, investigation_id=args.investigation)
+            print(f"Snapshot created: {sid} — {args.name}")
+        elif args.snap_command == "list":
+            snaps = snapshot_manager.list_snapshots()
+            if not snaps:
+                print("No snapshots.")
+            else:
+                for s in snaps:
+                    print(f"  {s.id}  {s.created_at}  {s.name}")
+        elif args.snap_command == "show":
+            import json as _json
+            s = snapshot_manager.get(args.snapshot_id)
+            if not s:
+                print(f"Snapshot not found: {args.snapshot_id}")
+            else:
+                data = _json.loads(s.snapshot_data)
+                print(f"Snapshot: {s.name} ({s.id})")
+                print(f"  Created: {s.created_at}")
+                print(f"  Investigation: {s.investigation_id}")
+                print(f"\n  Counts:")
+                for table, count in data.get("counts", {}).items():
+                    print(f"    {table}: {count}")
+        elif args.snap_command == "stats":
+            s = snapshot_manager.stats()
+            print(f"Snapshots: {s['total_snapshots']}")
+        else:
+            snap_parser.print_help()
+
+    elif args.command == "changes":
+        from cos.memory.incremental import update_tracker
+        if args.changes_command == "pending":
+            pending = update_tracker.get_pending()
+            if not pending:
+                print("No pending changes.")
+            else:
+                for c in pending:
+                    print(f"  {c.id}  [{c.change_type}] {c.target_type}/{c.target_id[:12]} — {c.created_at}")
+        elif args.changes_command == "apply":
+            n = update_tracker.apply_pending()
+            print(f"Applied {n} pending changes")
+        elif args.changes_command == "stats":
+            s = update_tracker.stats()
+            print(f"Memory Changes: {s['total']} total")
+            for st, cnt in s["by_status"].items():
+                print(f"  {st}: {cnt}")
+        else:
+            changes_parser.print_help()
+
+    elif args.command == "connectors":
+        from cos.memory.connectors import connector_registry
+        if args.fetch_command == "list":
+            conns = connector_registry.list_connectors()
+            for c in conns:
+                status = "enabled" if c.enabled else "disabled"
+                print(f"  {c.name:>12} [{status}] {c.domain:>15} — {c.description}")
+        elif args.fetch_command == "fetch":
+            try:
+                results = connector_registry.fetch(args.connector, args.query)
+                print(f"Fetched {len(results)} results from '{args.connector}':")
+                for r in results[:5]:
+                    print(f"  {r}")
+            except Exception as e:
+                print(f"Error: {e}")
+        elif args.fetch_command == "stats":
+            s = connector_registry.stats()
+            print(f"Connectors: {s['registered']} registered, {s['total_fetches']} total fetches")
+            for n, info in s["by_connector"].items():
+                print(f"  {n}: {info['fetches']} fetches, {info['results']} results")
+        else:
+            fetch_parser.print_help()
+
+    elif args.command == "gaps":
+        from cos.memory.gaps import gap_detector
+        if args.gaps_command == "detect":
+            gaps = gap_detector.detect_all()
+            print("Knowledge Gaps Detected:\n")
+            print(f"  Unlinked entities:     {len(gaps['unlinked_entities'])}")
+            for e in gaps["unlinked_entities"][:5]:
+                print(f"    {e['name']} ({e['type']})")
+            print(f"  Low confidence concepts: {len(gaps['low_confidence_concepts'])}")
+            for c in gaps["low_confidence_concepts"][:5]:
+                print(f"    {c['name']} ({c['domain']}) conf={c['confidence']:.2f}")
+            print(f"  Orphan chunks:         {len(gaps['orphan_chunks'])}")
+            print(f"  Missing provenance:    {len(gaps['missing_provenance'])}")
+            print(f"  Sparse domains:        {len(gaps['sparse_domains'])}")
+            for d in gaps["sparse_domains"]:
+                print(f"    {d['domain']}: {d['concept_count']} concepts")
+        elif args.gaps_command == "summary":
+            s = gap_detector.summary()
+            print(f"Knowledge Gap Summary: {s['total_gaps']} total gaps")
+            for k, v in s.items():
+                if k != "total_gaps":
+                    print(f"  {k}: {v}")
+        else:
+            gaps_parser.print_help()
+
+    elif args.command == "viz":
+        from cos.memory.visualization import memory_viz
+        if args.viz_command == "tree":
+            tree = memory_viz.graph_ascii(args.entity, depth=args.depth)
+            print(tree)
+        elif args.viz_command == "map":
+            print(memory_viz.memory_map())
+        elif args.viz_command == "clusters":
+            clusters = memory_viz.domain_clusters()
+            for domain, concepts in clusters.items():
+                print(f"\n  {domain} ({len(concepts)} concepts):")
+                for c in concepts:
+                    print(f"    {c['name']:>25} conf={c['confidence']:.2f}")
+        elif args.viz_command == "export":
+            data = memory_viz.export_graph()
+            if args.output:
+                with open(args.output, "w", encoding="utf-8") as f:
+                    f.write(data)
+                print(f"Graph exported to {args.output}")
+            else:
+                print(data[:500] + "..." if len(data) > 500 else data)
+        elif args.viz_command == "stats":
+            s = memory_viz.stats()
+            print(f"Visualization: {s['entities']} entities, {s['relations']} relations, {s['concepts']} concepts")
+        else:
+            viz_parser.print_help()
 
     elif args.command == "health":
         from cos.core.health import get_health_report, format_health_report
