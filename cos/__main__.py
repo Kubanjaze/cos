@@ -326,6 +326,51 @@ def main():
     viz_export_p.add_argument("--output", default=None, help="Output file path")
     viz_sub.add_parser("stats", help="Visualization statistics")
 
+    # ── Track C: Reasoning Engine ──────────────────────────
+    synth_parser = sub.add_parser("synthesize", help="Multi-source synthesis")
+    synth_sub = synth_parser.add_subparsers(dest="synth_command")
+    synth_run_p = synth_sub.add_parser("run", help="Run synthesis")
+    synth_run_p.add_argument("query")
+    synth_run_p.add_argument("--investigation", default="default")
+    synth_sub.add_parser("list", help="List syntheses")
+    synth_sub.add_parser("stats", help="Synthesis statistics")
+
+    hyp_parser = sub.add_parser("hypotheses", help="Hypothesis generation")
+    hyp_sub = hyp_parser.add_subparsers(dest="hyp_command")
+    hyp_sub.add_parser("generate", help="Generate hypotheses")
+    hyp_sub.add_parser("list", help="List hypotheses")
+    hyp_challenge_p = hyp_sub.add_parser("challenge", help="Challenge a hypothesis")
+    hyp_challenge_p.add_argument("hypothesis_id")
+    hyp_refine_p = hyp_sub.add_parser("refine", help="Refine a hypothesis")
+    hyp_refine_p.add_argument("hypothesis_id")
+    hyp_sub.add_parser("stats", help="Hypothesis statistics")
+
+    reason_parser = sub.add_parser("reason", help="Reasoning operations")
+    reason_sub = reason_parser.add_subparsers(dest="reason_command")
+    reason_mp_p = reason_sub.add_parser("multipass", help="Multi-pass reasoning")
+    reason_mp_p.add_argument("query")
+    reason_mp_p.add_argument("--passes", type=int, default=3)
+    reason_sub.add_parser("patterns", help="Detect patterns")
+    reason_sub.add_parser("contradictions", help="Analyze contradictions")
+    reason_sub.add_parser("uncertainty", help="System uncertainty report")
+    reason_sub.add_parser("evidence", help="Weight evidence sources")
+    reason_sub.add_parser("insights", help="Extract insights")
+    reason_sub.add_parser("signal-noise", help="Classify signal vs noise")
+    reason_compare_p = reason_sub.add_parser("compare", help="Compare scaffolds")
+    reason_compare_p.add_argument("scaffold_a")
+    reason_compare_p.add_argument("scaffold_b")
+    reason_sub.add_parser("causal", help="Infer causal relationships")
+    reason_sub.add_parser("scenarios", help="Generate scenarios")
+    reason_compress_p = reason_sub.add_parser("compress", help="Compress domain knowledge")
+    reason_compress_p.add_argument("--domain", default="general")
+    reason_domain_p = reason_sub.add_parser("domain", help="Domain-specific analysis")
+    reason_domain_p.add_argument("domain_name")
+    reason_domain_p.add_argument("query")
+    reason_sub.add_parser("explain", help="Explainability stats")
+    reason_sub.add_parser("cost", help="Reasoning cost analysis")
+    reason_sub.add_parser("benchmark", help="Run reasoning benchmark")
+    reason_sub.add_parser("benchmark-history", help="Benchmark run history")
+
     sub.add_parser("health", help="System health dashboard")
 
     docs_parser = sub.add_parser("docs", help="Document store")
@@ -1244,6 +1289,168 @@ def main():
             print(f"Visualization: {s['entities']} entities, {s['relations']} relations, {s['concepts']} concepts")
         else:
             viz_parser.print_help()
+
+    # ── Track C: Reasoning Handlers ──────────────────────────
+    elif args.command == "synthesize":
+        from cos.reasoning.synthesis import synthesis_engine
+        if args.synth_command == "run":
+            syn = synthesis_engine.synthesize(args.query, investigation_id=args.investigation)
+            print(f"Synthesis: '{syn.query}' ({syn.source_count} sources)\n")
+            print(f"  {syn.summary}")
+            for s in syn.sources[:5]:
+                print(f"  [{s['type']:>8}] {s.get('name','')[:25]} (conf={s.get('confidence',0):.2f})")
+        elif args.synth_command == "list":
+            for s in synthesis_engine.list_syntheses():
+                print(f"  {s['id']}  {s['query'][:30]:>30}  {s['sources']} sources  {s['created_at']}")
+        elif args.synth_command == "stats":
+            s = synthesis_engine.stats()
+            print(f"Syntheses: {s['total']} total, avg {s['avg_sources']} sources")
+        else:
+            synth_parser.print_help()
+
+    elif args.command == "hypotheses":
+        from cos.reasoning.hypothesis import hypothesis_generator
+        if args.hyp_command == "generate":
+            hyps = hypothesis_generator.generate()
+            print(f"Generated {len(hyps)} hypotheses:")
+            for h in hyps:
+                print(f"  {h['id']}  conf={h['confidence']:.2f}  {h['statement'][:70]}")
+        elif args.hyp_command == "list":
+            for h in hypothesis_generator.list_hypotheses():
+                print(f"  [{h['status']:>8}] conf={h['confidence']:.2f}  {h['statement'][:60]}")
+        elif args.hyp_command == "challenge":
+            from cos.reasoning.disconfirmation import disconfirmation_engine
+            result = disconfirmation_engine.challenge(args.hypothesis_id)
+            if "error" in result:
+                print(f"Error: {result['error']}")
+            else:
+                print(f"Challenge: {result['statement'][:60]}")
+                print(f"  Original confidence: {result['original_confidence']:.3f}")
+                print(f"  Challenges found: {result['challenge_count']}")
+                print(f"  Adjusted confidence: {result['adjusted_confidence']:.3f}")
+                for c in result["challenges"]:
+                    print(f"    - [{c['type']}] {c['detail']}")
+        elif args.hyp_command == "refine":
+            from cos.reasoning.refinement import refinement_loop
+            result = refinement_loop.refine_hypothesis(args.hypothesis_id)
+            if "error" in result:
+                print(f"Error: {result['error']}")
+            else:
+                print(f"Refined: iteration {result['iteration']}, {result['confidence_before']:.3f} → {result['confidence_after']:.3f}")
+        elif args.hyp_command == "stats":
+            s = hypothesis_generator.stats()
+            print(f"Hypotheses: {s['total']} total, avg confidence={s['avg_confidence']:.3f}")
+            for st, cnt in s["by_status"].items():
+                print(f"  {st}: {cnt}")
+        else:
+            hyp_parser.print_help()
+
+    elif args.command == "reason":
+        if args.reason_command == "multipass":
+            from cos.reasoning.multipass import multipass_reasoner
+            result = multipass_reasoner.reason(args.query, passes=args.passes)
+            print(f"Multi-pass reasoning: '{args.query}' ({result['total_passes']} passes, {result['total_duration_s']:.3f}s)")
+            for p in result["passes"]:
+                actions = ", ".join(f"{a['type']}" for a in p["actions"])
+                print(f"  Pass {p['pass']}: {actions} ({p['duration_s']:.3f}s)")
+        elif args.reason_command == "patterns":
+            from cos.reasoning.patterns import pattern_detector
+            s = pattern_detector.stats()
+            print(f"Patterns: {s['scaffold_patterns']} scaffold, {s['relation_types']} relation types, {s['entity_types']} entity types, {s['domains']} domains")
+            for p in pattern_detector.scaffold_activity_patterns():
+                print(f"  {p['scaffold']:>6}: {p['compounds']} compounds, avg pIC50={p['avg_pIC50']:.2f}, spread={p['spread']:.2f} ({p['trend']})")
+        elif args.reason_command == "contradictions":
+            from cos.reasoning.contradictions import contradiction_analyzer
+            analyses = contradiction_analyzer.analyze()
+            print(f"Contradiction analysis: {len(analyses)} open conflicts")
+            for a in analyses:
+                print(f"  [{a['severity']:>6}] {a['description'][:60]}")
+                print(f"          Suggestion: {a['suggestion']}")
+        elif args.reason_command == "uncertainty":
+            from cos.reasoning.uncertainty import uncertainty_estimator
+            s = uncertainty_estimator.system_uncertainty()
+            print(f"System Uncertainty Report:")
+            for k, v in s.items():
+                print(f"  {k}: {v}")
+        elif args.reason_command == "evidence":
+            from cos.reasoning.evidence import evidence_weighter
+            sources = evidence_weighter.weight_sources()
+            print(f"Evidence sources ({len(sources)}):")
+            for s in sources:
+                print(f"  {s['name']:>15} weight={s['weight']:.3f} entities={s['entities']} relations={s['relations']}")
+        elif args.reason_command == "insights":
+            from cos.reasoning.insights import insight_extractor
+            insights = insight_extractor.extract()
+            print(f"Insights: {len(insights)} found")
+            for i in insights:
+                print(f"  [{i['type']:>16}] novelty={i['novelty']:.2f} — {i['description'][:60]}")
+        elif args.reason_command == "signal-noise":
+            from cos.reasoning.signal_noise import signal_noise_classifier
+            s = signal_noise_classifier.stats()
+            print(f"Signal/Noise: entities={s['entity_signal']} signal / {s['entity_noise']} noise, concepts={s['concept_signal']} signal / {s['concept_noise']} noise")
+        elif args.reason_command == "compare":
+            from cos.reasoning.comparison import comparison_engine
+            result = comparison_engine.compare_scaffolds(args.scaffold_a, args.scaffold_b)
+            for key in ["a", "b"]:
+                p = result[key]
+                print(f"  {p['scaffold']:>6}: {p['compounds']} compounds, avg pIC50={p['avg_pIC50']}, max={p['max_pIC50']}")
+            print(f"  Winner: {result['winner']} (margin={result['margin']})")
+        elif args.reason_command == "causal":
+            from cos.reasoning.causal import causal_inference
+            claims = causal_inference.infer()
+            print(f"Causal claims: {len(claims)}")
+            for c in claims:
+                print(f"  {c['cause']} → {c['effect']} ({c['mechanism']}) conf={c['confidence']:.2f}")
+        elif args.reason_command == "scenarios":
+            from cos.reasoning.scenarios import scenario_generator
+            scenarios = scenario_generator.generate()
+            print(f"Scenarios: {len(scenarios)}")
+            for s in scenarios:
+                print(f"  [{s['impact']:>6}] likelihood={s['likelihood']:.1f} — {s['title']}")
+        elif args.reason_command == "compress":
+            from cos.reasoning.compression import compression_engine
+            result = compression_engine.compress_domain(args.domain)
+            print(f"Domain: {result['domain']} ({result['concept_count']} concepts)")
+            print(f"  {result['summary']}")
+        elif args.reason_command == "domain":
+            from cos.reasoning.domain_adapters import domain_adapter_registry
+            result = domain_adapter_registry.analyze(args.domain_name, args.query)
+            print(f"Domain analysis ({result['adapter']}):")
+            for k, v in result.items():
+                if k not in ("adapter", "query"):
+                    print(f"  {k}: {v}")
+        elif args.reason_command == "explain":
+            from cos.reasoning.explainability import explainability_layer
+            s = explainability_layer.stats()
+            print(f"Explainability: {s['explainable_hypotheses']} hypotheses, {s['explainable_scores']} scores, {s['explainable_conflicts']} conflicts")
+        elif args.reason_command == "cost":
+            from cos.reasoning.cost_optimizer import reasoning_cost_optimizer
+            result = reasoning_cost_optimizer.analyze_costs()
+            print(f"Reasoning Cost Analysis:")
+            print(f"  Total API cost: ${result['total_api_cost']:.4f}")
+            print(f"  API calls: {result['api_calls']}")
+            print(f"  Syntheses: {result['syntheses']}")
+            for r in result["recommendations"]:
+                print(f"  → {r}")
+        elif args.reason_command == "benchmark":
+            from cos.reasoning.benchmark import reasoning_benchmark
+            result = reasoning_benchmark.run_benchmark()
+            print(f"Benchmark: {result['name']} (composite={result['composite']:.4f})")
+            print(f"  Quality:  {result['quality']:.4f} (40% → {result['scorecard']['quality_40pct']:.4f})")
+            print(f"  Cost:     ${result['cost_usd']:.4f} (40% → {result['scorecard']['cost_40pct']:.4f})")
+            print(f"  Latency:  {result['latency_p95_s']:.3f}s (20% → {result['scorecard']['latency_20pct']:.4f})")
+            print(f"  Duration: {result['duration_s']:.3f}s")
+        elif args.reason_command == "benchmark-history":
+            from cos.reasoning.benchmark import reasoning_benchmark
+            runs = reasoning_benchmark.list_runs()
+            if not runs:
+                print("No benchmark runs.")
+            else:
+                print(f"{'Composite':>10} {'Quality':>8} {'Cost':>8} {'Latency':>8} Created")
+                for r in runs:
+                    print(f"{r['composite']:>10.4f} {r['quality']:>8.4f} ${r['cost']:>7.4f} {r['latency']:>7.3f}s {r['created_at']}")
+        else:
+            reason_parser.print_help()
 
     elif args.command == "health":
         from cos.core.health import get_health_report, format_health_report
