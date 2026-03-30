@@ -96,6 +96,14 @@ def main():
     status_p.add_argument("task_id", help="Task ID (full or partial)")
     task_sub.add_parser("run", help="Process pending tasks")
 
+    ent_parser = sub.add_parser("entities", help="Entity extraction")
+    ent_sub = ent_parser.add_subparsers(dest="ent_command")
+    ent_extract_p = ent_sub.add_parser("extract", help="Extract entities from document")
+    ent_extract_p.add_argument("doc_id")
+    ent_list_p = ent_sub.add_parser("list", help="List entities")
+    ent_list_p.add_argument("--type", default=None, help="Filter by entity type")
+    ent_sub.add_parser("stats", help="Entity statistics")
+
     embed_parser = sub.add_parser("embed", help="Embedding pipeline")
     embed_sub = embed_parser.add_subparsers(dest="embed_command")
     embed_doc_p = embed_sub.add_parser("doc", help="Embed a document's chunks")
@@ -353,6 +361,27 @@ def main():
             print(f"Processed {n} tasks.")
         else:
             task_parser.print_help()
+
+    elif args.command == "entities":
+        from cos.memory.entities import entity_extractor
+        if args.ent_command == "extract":
+            n = entity_extractor.extract_from_document(args.doc_id)
+            print(f"Extracted {n} entities from {args.doc_id}")
+        elif args.ent_command == "list":
+            ents = entity_extractor.get_entities(entity_type=args.type)
+            if not ents:
+                print("No entities found.")
+            else:
+                print(f"{'Type':>15} {'Name':>20} {'Confidence':>10} Document")
+                for e in ents:
+                    print(f"{e.entity_type:>15} {e.name:>20} {e.confidence:>10.2f} {e.document_id[:12]}")
+        elif args.ent_command == "stats":
+            s = entity_extractor.stats()
+            print(f"Entities: {s['total']} total")
+            for t, c in s["by_type"].items():
+                print(f"  {t}: {c}")
+        else:
+            ent_parser.print_help()
 
     elif args.command == "embed":
         from cos.memory.embeddings import embedding_pipeline
