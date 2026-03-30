@@ -144,6 +144,34 @@ def main():
     embed_search_p.add_argument("--top-k", type=int, default=5)
     embed_sub.add_parser("stats", help="Embedding statistics")
 
+    concept_parser = sub.add_parser("concepts", help="Semantic memory (concepts)")
+    concept_sub = concept_parser.add_subparsers(dest="concept_command")
+    concept_def_p = concept_sub.add_parser("define", help="Define a concept")
+    concept_def_p.add_argument("name", help="Concept name")
+    concept_def_p.add_argument("definition", help="Concept definition")
+    concept_def_p.add_argument("--domain", default="general", help="Domain (e.g., cheminformatics)")
+    concept_def_p.add_argument("--category", default="general", help="Category (e.g., target, compound)")
+    concept_def_p.add_argument("--confidence", type=float, default=0.5, help="Confidence 0-1")
+    concept_def_p.add_argument("--source", default="", help="Source reference")
+    concept_def_p.add_argument("--investigation", default="default")
+    concept_list_p = concept_sub.add_parser("list", help="List concepts")
+    concept_list_p.add_argument("--domain", default=None)
+    concept_list_p.add_argument("--category", default=None)
+    concept_get_p = concept_sub.add_parser("get", help="Get concept by name")
+    concept_get_p.add_argument("name")
+    concept_get_p.add_argument("--domain", default=None)
+    concept_search_p = concept_sub.add_parser("search", help="Search concepts")
+    concept_search_p.add_argument("query", help="Text to search in name/definition")
+    concept_search_p.add_argument("--domain", default=None)
+    concept_search_p.add_argument("--category", default=None)
+    concept_update_p = concept_sub.add_parser("update", help="Update a concept")
+    concept_update_p.add_argument("name")
+    concept_update_p.add_argument("--domain", default="general")
+    concept_update_p.add_argument("--definition", default=None)
+    concept_update_p.add_argument("--confidence", type=float, default=None)
+    concept_update_p.add_argument("--category", default=None)
+    concept_sub.add_parser("stats", help="Concept statistics")
+
     sub.add_parser("health", help="System health dashboard")
 
     docs_parser = sub.add_parser("docs", help="Document store")
@@ -534,6 +562,71 @@ def main():
                     print(f"  [{r['doc_id']}:{r['chunk_index']}] {r['title']} — {r['text'][:80]}...")
         else:
             docs_parser.print_help()
+
+    elif args.command == "concepts":
+        from cos.memory.semantic import semantic_memory
+        if args.concept_command == "define":
+            cid = semantic_memory.define(
+                args.name, args.definition, domain=args.domain, category=args.category,
+                confidence=args.confidence, source_ref=args.source,
+                investigation_id=args.investigation,
+            )
+            print(f"Concept defined: {cid} — {args.name} (domain={args.domain})")
+        elif args.concept_command == "list":
+            concepts = semantic_memory.list_concepts(domain=args.domain, category=args.category)
+            if not concepts:
+                print("No concepts found.")
+            else:
+                print(f"{'Name':>20} {'Domain':>15} {'Category':>12} {'Conf':>5} {'Updated':>20}")
+                for c in concepts:
+                    print(f"{c.name:>20} {c.domain:>15} {c.category:>12} {c.confidence:>5.2f} {c.updated_at:>20}")
+        elif args.concept_command == "get":
+            c = semantic_memory.get(args.name, domain=args.domain)
+            if not c:
+                print(f"Concept not found: {args.name}")
+            else:
+                print(f"Concept: {c.name}")
+                print(f"  ID:         {c.id}")
+                print(f"  Domain:     {c.domain}")
+                print(f"  Category:   {c.category}")
+                print(f"  Confidence: {c.confidence:.2f}")
+                print(f"  Source:     {c.source_ref or '—'}")
+                print(f"  Inv:        {c.investigation_id}")
+                print(f"  Created:    {c.created_at}")
+                print(f"  Updated:    {c.updated_at}")
+                print(f"\n  Definition: {c.definition}")
+        elif args.concept_command == "search":
+            results = semantic_memory.search(text=args.query, domain=args.domain, category=args.category)
+            if not results:
+                print(f"No concepts matching '{args.query}'")
+            else:
+                print(f"Found {len(results)} concept(s) matching '{args.query}':\n")
+                for c in results:
+                    print(f"  {c.name:>20} ({c.domain}/{c.category}) conf={c.confidence:.2f}")
+                    print(f"  {'':>20} {c.definition[:80]}")
+                    print()
+        elif args.concept_command == "update":
+            ok = semantic_memory.update(
+                args.name, domain=args.domain, definition=args.definition,
+                confidence=args.confidence, category=args.category,
+            )
+            if ok:
+                print(f"Concept updated: {args.name} (domain={args.domain})")
+            else:
+                print(f"Concept not found: {args.name} (domain={args.domain})")
+        elif args.concept_command == "stats":
+            s = semantic_memory.stats()
+            print(f"Semantic Memory: {s['total']} concepts, avg confidence={s['avg_confidence']:.3f}")
+            if s["by_domain"]:
+                print(f"\nBy domain:")
+                for d, cnt in s["by_domain"].items():
+                    print(f"  {d}: {cnt}")
+            if s["by_category"]:
+                print(f"\nBy category:")
+                for cat, cnt in s["by_category"].items():
+                    print(f"  {cat}: {cnt}")
+        else:
+            concept_parser.print_help()
 
     elif args.command == "health":
         from cos.core.health import get_health_report, format_health_report
