@@ -172,6 +172,34 @@ def main():
     concept_update_p.add_argument("--category", default=None)
     concept_sub.add_parser("stats", help="Concept statistics")
 
+    proc_parser = sub.add_parser("procedures", help="Procedural memory (saved workflows)")
+    proc_sub = proc_parser.add_subparsers(dest="proc_command")
+    proc_def_p = proc_sub.add_parser("define", help="Define a procedure")
+    proc_def_p.add_argument("name", help="Procedure name")
+    proc_def_p.add_argument("steps_json", help='Steps as JSON array, e.g. \'[{"command":"status"}]\'')
+    proc_def_p.add_argument("--description", default="", help="Procedure description")
+    proc_def_p.add_argument("--domain", default="general")
+    proc_def_p.add_argument("--category", default="general")
+    proc_def_p.add_argument("--source", default="", help="Source reference")
+    proc_def_p.add_argument("--investigation", default="default")
+    proc_list_p = proc_sub.add_parser("list", help="List procedures")
+    proc_list_p.add_argument("--domain", default=None)
+    proc_list_p.add_argument("--category", default=None)
+    proc_get_p = proc_sub.add_parser("get", help="Get procedure by name")
+    proc_get_p.add_argument("name")
+    proc_run_p = proc_sub.add_parser("run", help="Run a procedure")
+    proc_run_p.add_argument("name")
+    proc_run_p.add_argument("--investigation", default="default")
+    proc_update_p = proc_sub.add_parser("update", help="Update a procedure")
+    proc_update_p.add_argument("name")
+    proc_update_p.add_argument("--description", default=None)
+    proc_update_p.add_argument("--steps-json", default=None, help="New steps JSON")
+    proc_update_p.add_argument("--domain", default=None)
+    proc_update_p.add_argument("--category", default=None)
+    proc_del_p = proc_sub.add_parser("delete", help="Delete a procedure")
+    proc_del_p.add_argument("name")
+    proc_sub.add_parser("stats", help="Procedure statistics")
+
     sub.add_parser("health", help="System health dashboard")
 
     docs_parser = sub.add_parser("docs", help="Document store")
@@ -627,6 +655,105 @@ def main():
                     print(f"  {cat}: {cnt}")
         else:
             concept_parser.print_help()
+
+    elif args.command == "procedures":
+        from cos.memory.procedural import procedural_memory
+        if args.proc_command == "define":
+            try:
+                import json as _json
+                steps = _json.loads(args.steps_json)
+                pid = procedural_memory.define(
+                    args.name, steps, description=args.description, domain=args.domain,
+                    category=args.category, source_ref=args.source,
+                    investigation_id=args.investigation,
+                )
+                print(f"Procedure defined: {pid} — {args.name} ({len(steps)} steps)")
+            except (ValueError, _json.JSONDecodeError) as e:
+                print(f"Error: {e}")
+        elif args.proc_command == "list":
+            procs = procedural_memory.list_procedures(domain=args.domain, category=args.category)
+            if not procs:
+                print("No procedures found.")
+            else:
+                print(f"{'Name':>20} {'Domain':>10} {'Cat':>10} {'Runs':>5} {'OK':>4} {'Fail':>4} {'Last Status':>12}")
+                for p in procs:
+                    print(f"{p.name:>20} {p.domain:>10} {p.category:>10} "
+                          f"{p.total_runs:>5} {p.success_count:>4} {p.fail_count:>4} "
+                          f"{p.last_run_status or '—':>12}")
+        elif args.proc_command == "get":
+            p = procedural_memory.get(args.name)
+            if not p:
+                print(f"Procedure not found: {args.name}")
+            else:
+                print(f"Procedure: {p.name}")
+                print(f"  ID:          {p.id}")
+                print(f"  Domain:      {p.domain}")
+                print(f"  Category:    {p.category}")
+                print(f"  Description: {p.description or '—'}")
+                print(f"  Steps:       {len(p.steps)}")
+                print(f"  Schema ver:  {p.steps_schema_version}")
+                print(f"  Runs:        {p.total_runs} (ok={p.success_count}, fail={p.fail_count})")
+                print(f"  Success rate:{p.success_rate:.0%}" if p.total_runs > 0 else "  Success rate: —")
+                print(f"  Last run:    {p.last_run_at or '—'} ({p.last_run_status or '—'})")
+                print(f"  Source:      {p.source_ref or '—'}")
+                print(f"  Inv:         {p.investigation_id}")
+                print(f"  Created:     {p.created_at}")
+                print(f"  Updated:     {p.updated_at}")
+                print(f"\n  Steps:")
+                for i, s in enumerate(p.steps, 1):
+                    cmd = s["command"] + (f" {s['subcommand']}" if s.get("subcommand") else "")
+                    kw = s.get("kwargs", {})
+                    kw_str = f" {kw}" if kw else ""
+                    print(f"    {i}. {cmd}{kw_str}")
+        elif args.proc_command == "run":
+            try:
+                result = procedural_memory.run(args.name, investigation_id=args.investigation)
+                print(f"\nProcedure: {result['procedure']} — {result['status']}")
+                for step in result["steps"]:
+                    status = "OK" if step["status"] == "completed" else "FAIL"
+                    cmd = step["command"] + (f" {step.get('subcommand','')}" if step.get("subcommand") else "")
+                    print(f"  Step {step['step']}: {cmd:25s} [{status}] {step['duration_s']:.3f}s")
+                if result.get("total_duration_s"):
+                    print(f"\nTotal: {result['total_duration_s']:.3f}s")
+            except ValueError as e:
+                print(f"Error: {e}")
+        elif args.proc_command == "update":
+            try:
+                new_steps = None
+                if args.steps_json:
+                    import json as _json
+                    new_steps = _json.loads(args.steps_json)
+                ok = procedural_memory.update(
+                    args.name, description=args.description, steps=new_steps,
+                    domain=args.domain, category=args.category,
+                )
+                if ok:
+                    print(f"Procedure updated: {args.name}")
+                else:
+                    print(f"Procedure not found: {args.name}")
+            except (ValueError, Exception) as e:
+                print(f"Error: {e}")
+        elif args.proc_command == "delete":
+            ok = procedural_memory.delete(args.name)
+            if ok:
+                print(f"Procedure deleted: {args.name}")
+            else:
+                print(f"Procedure not found: {args.name}")
+        elif args.proc_command == "stats":
+            s = procedural_memory.stats()
+            print(f"Procedural Memory: {s['total']} procedures")
+            print(f"  Total runs: {s['total_runs']} (ok={s['total_success']}, fail={s['total_fail']})")
+            print(f"  Success rate: {s['success_rate']:.0%}" if s['total_runs'] > 0 else "  Success rate: —")
+            if s["by_domain"]:
+                print(f"\nBy domain:")
+                for d, cnt in s["by_domain"].items():
+                    print(f"  {d}: {cnt}")
+            if s["by_category"]:
+                print(f"\nBy category:")
+                for cat, cnt in s["by_category"].items():
+                    print(f"  {cat}: {cnt}")
+        else:
+            proc_parser.print_help()
 
     elif args.command == "health":
         from cos.core.health import get_health_report, format_health_report
