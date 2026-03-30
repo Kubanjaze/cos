@@ -194,3 +194,12 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - CLI: `python -m cos concepts {define,list,get,search,update,stats}`
 - Completes 2/3 of MemoryItem kinds (episodic + semantic; procedural in Phase 128)
 - Project version: 0.2.8 → 0.2.9
+
+### 2026-03-30 11:57 — Procedural memory added (Phase 128)
+- `cos/memory/procedural.py` — saved workflows ("how we do things")
+- 16th DB table: `procedures` with 16 columns + success/fail counters
+- define/get/list/run/update/delete/stats + define-time command validation
+- Registry error detection: catches `"Error: ..."` strings as step failures
+- CLI: `python -m cos procedures {define,list,get,run,update,delete,stats}`
+- **3-kind memory model complete**: episodic (126) + semantic (127) + procedural (128)
+- Project version: 0.2.9 → 0.3.0
