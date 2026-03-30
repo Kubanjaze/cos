@@ -438,6 +438,28 @@ def main():
     dec_sub.add_parser("benchmark", help="Decision quality benchmark")
     dec_sub.add_parser("stats", help="Decision statistics")
 
+    # ── Track F: Interface Layer ──────────────────────────
+    ui_parser = sub.add_parser("ui", help="Interface layer")
+    ui_sub = ui_parser.add_subparsers(dest="ui_command")
+    ui_dash_p = ui_sub.add_parser("dashboard", help="Workspace dashboard")
+    ui_inv_p = ui_sub.add_parser("investigation", help="Investigation dashboard")
+    ui_inv_p.add_argument("investigation_id", nargs="?", default="default")
+    ui_chat_p = ui_sub.add_parser("chat", help="Query COS")
+    ui_chat_p.add_argument("question")
+    ui_sub.add_parser("timeline", help="Event timeline")
+    ui_graph_p = ui_sub.add_parser("graph", help="Entity graph view")
+    ui_graph_p.add_argument("entity")
+    ui_graph_p.add_argument("--depth", type=int, default=1)
+    ui_sub.add_parser("domains", help="Domain map")
+    ui_sub.add_parser("decision-tree", help="Decision tree view")
+    ui_build_p = ui_sub.add_parser("build-workflow", help="Workflow builder")
+    ui_build_p.add_argument("name")
+    ui_setting_p = ui_sub.add_parser("setting", help="Set a user preference")
+    ui_setting_p.add_argument("key")
+    ui_setting_p.add_argument("value")
+    ui_sub.add_parser("settings", help="List user settings")
+    ui_sub.add_parser("stats", help="Interface statistics")
+
     sub.add_parser("health", help="System health dashboard")
 
     docs_parser = sub.add_parser("docs", help="Document store")
@@ -1772,6 +1794,56 @@ def main():
                 print(f"  {st}: {cnt}")
         else:
             dec_parser.print_help()
+
+    # ── Track F: Interface Handlers ──────────────────────────
+    elif args.command == "ui":
+        if args.ui_command == "dashboard":
+            from cos.interface.dashboard import workspace_dashboard
+            print(workspace_dashboard.render())
+        elif args.ui_command == "investigation":
+            from cos.interface.investigation_ui import investigation_ui
+            print(investigation_ui.dashboard(args.investigation_id))
+        elif args.ui_command == "chat":
+            from cos.interface.chat import chat_interface
+            result = chat_interface.query(args.question)
+            print(f"Q: {result['question']}")
+            print(f"Answers ({result['answer_count']}, {result['duration_s']:.3f}s):\n")
+            for a in result["answers"]:
+                print(f"  [{a['type']:>15}] {a['content'][:65]}")
+                print(f"                  source={a['source']} conf={a.get('confidence',0):.2f}")
+        elif args.ui_command == "timeline":
+            from cos.interface.dashboard import workspace_dashboard
+            print(workspace_dashboard.timeline())
+        elif args.ui_command == "graph":
+            from cos.interface.graph_ui import graph_ui
+            print(graph_ui.render_entity_graph(args.entity, depth=args.depth))
+        elif args.ui_command == "domains":
+            from cos.interface.graph_ui import graph_ui
+            print(graph_ui.render_domain_map())
+        elif args.ui_command == "decision-tree":
+            from cos.interface.graph_ui import graph_ui
+            print(graph_ui.render_decision_tree())
+        elif args.ui_command == "build-workflow":
+            from cos.interface.graph_ui import workflow_builder_ui
+            print(workflow_builder_ui.interactive_build(args.name))
+        elif args.ui_command == "setting":
+            from cos.interface.dashboard import user_settings
+            user_settings.set(args.key, args.value)
+            print(f"Setting saved: {args.key} = {args.value}")
+        elif args.ui_command == "settings":
+            from cos.interface.dashboard import user_settings
+            s = user_settings.list_all()
+            if not s:
+                print("No user settings.")
+            else:
+                for k, v in s.items():
+                    print(f"  {k}: {v}")
+        elif args.ui_command == "stats":
+            from cos.interface.dashboard import workspace_dashboard
+            s = workspace_dashboard.stats()
+            print(f"Interface: {s['dashboard_sections']} dashboard sections, {s['db_tables']} DB tables")
+        else:
+            ui_parser.print_help()
 
     elif args.command == "health":
         from cos.core.health import get_health_report, format_health_report
