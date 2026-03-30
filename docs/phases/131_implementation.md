@@ -1,34 +1,40 @@
 # Phase 131 — Conflict Detection (Contradictions)
 
-**Version:** 1.0 | **Tier:** Standard | **Date:** 2026-03-30
+**Version:** 1.1 | **Tier:** Standard | **Date:** 2026-03-30
 
 ## Goal
-Detect contradictions in COS memory — conflicting facts, duplicate concepts with different definitions, or entities with inconsistent relations. Answers "where does knowledge disagree?"
+Detect contradictions in COS memory — conflicting facts, duplicate concepts with different definitions, or entities with inconsistent relations.
 
 CLI: `python -m cos conflicts {scan,list,resolve,stats}`
 
 Outputs: Conflict records in SQLite `conflicts` table (table 18)
 
 ## Logic
-1. `conflicts` table: id, conflict_type, item_a_type, item_a_id, item_b_type, item_b_id, description, severity, status, resolution, investigation_id, created_at, resolved_at
-2. `scan()` — detect conflicts across memory: duplicate concepts, contradictory relations, confidence disagreements
-3. `list_conflicts()` — list detected conflicts with optional status/type filters
-4. `resolve(conflict_id, resolution)` — mark a conflict as resolved with explanation
-5. `stats()` — total, by type, by severity, by status
+1. `conflicts` table: 13 columns incl. conflict_type, severity, status, resolution
+2. `scan()` runs 3 detectors: duplicate_concept, contradictory_relation, confidence_disagreement
+3. `list_conflicts()` with status/type/severity filters
+4. `resolve(conflict_id, resolution)` marks resolved with timestamp
+5. `stats()` totals by type, severity, status
 
 ## Key Concepts
-- **Conflict types**: duplicate_concept, contradictory_relation, confidence_disagreement, stale_definition
-- **Severity levels**: low, medium, high
-- **Status**: open, resolved, ignored
-- **Scan detects**: same concept name across domains with different definitions, same entity with conflicting activity values, low-confidence items contradicting high-confidence ones
+- **3 scan detectors**: duplicate concepts across domains, contradictory activity values, confidence gaps >0.5
+- **Deduplication**: won't re-create existing open conflict for same item pair
+- **Partial ID resolution**: resolve() supports partial conflict IDs
 
 ## Verification Checklist
-- [ ] `scan()` detects conflicts in existing data
-- [ ] `list_conflicts()` returns detected conflicts
-- [ ] `resolve(id, "kept higher confidence version")` marks resolved
-- [ ] `stats()` shows totals by type/severity/status
-- [ ] CLI: conflicts scan/list/resolve/stats all work
+- [x] `scan()` detects 2 conflicts after creating cross-domain CETP concept
+- [x] `list_conflicts()` shows duplicate_concept + confidence_disagreement
+- [x] `resolve()` marks conflict resolved with explanation
+- [x] `stats()` shows 2 total, by type/severity/status
+- [x] CLI: all commands work
 
-## Risks
-- False positives: legitimate cross-domain concept differences flagged as conflicts
-- Scan performance: queries multiple tables — acceptable at current scale
+## Results
+| Metric | Value |
+|--------|-------|
+| Conflicts detected | 2 (duplicate_concept + confidence_disagreement) |
+| DB table | conflicts (table 18) |
+| Scan detectors | 3 |
+| External deps | 0 |
+| Cost | $0.00 |
+
+Key finding: Cross-domain concept definitions naturally produce both duplicate and confidence conflicts, validating the multi-detector approach.

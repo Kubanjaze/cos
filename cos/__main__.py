@@ -240,6 +240,18 @@ def main():
     prov_sub.add_parser("backfill", help="Reconstruct provenance from existing data")
     prov_sub.add_parser("stats", help="Provenance statistics")
 
+    conf_parser = sub.add_parser("conflicts", help="Conflict detection")
+    conf_sub = conf_parser.add_subparsers(dest="conf_command")
+    conf_sub.add_parser("scan", help="Scan for conflicts")
+    conf_list_p = conf_sub.add_parser("list", help="List conflicts")
+    conf_list_p.add_argument("--status", default=None)
+    conf_list_p.add_argument("--type", default=None)
+    conf_list_p.add_argument("--severity", default=None)
+    conf_res_p = conf_sub.add_parser("resolve", help="Resolve a conflict")
+    conf_res_p.add_argument("conflict_id")
+    conf_res_p.add_argument("resolution")
+    conf_sub.add_parser("stats", help="Conflict statistics")
+
     sub.add_parser("health", help="System health dashboard")
 
     docs_parser = sub.add_parser("docs", help="Document store")
@@ -898,6 +910,44 @@ def main():
                     print(f"  {t}: {cnt}")
         else:
             prov_parser.print_help()
+
+    elif args.command == "conflicts":
+        from cos.memory.conflicts import conflict_detector
+        if args.conf_command == "scan":
+            n = conflict_detector.scan()
+            print(f"Conflict scan: {n} new conflicts detected")
+        elif args.conf_command == "list":
+            conflicts = conflict_detector.list_conflicts(
+                status=args.status, conflict_type=args.type, severity=args.severity)
+            if not conflicts:
+                print("No conflicts found.")
+            else:
+                for c in conflicts:
+                    print(f"  [{c.severity:>6}] [{c.status:>8}] {c.conflict_type}: {c.description[:70]}")
+                    print(f"           ID: {c.id}  A: {c.item_a_id[:12]}  B: {c.item_b_id[:12]}")
+        elif args.conf_command == "resolve":
+            ok = conflict_detector.resolve(args.conflict_id, args.resolution)
+            if ok:
+                print(f"Conflict resolved: {args.conflict_id}")
+            else:
+                print(f"Conflict not found: {args.conflict_id}")
+        elif args.conf_command == "stats":
+            s = conflict_detector.stats()
+            print(f"Conflicts: {s['total']} total")
+            if s["by_type"]:
+                print(f"\nBy type:")
+                for t, cnt in s["by_type"].items():
+                    print(f"  {t}: {cnt}")
+            if s["by_severity"]:
+                print(f"\nBy severity:")
+                for sv, cnt in s["by_severity"].items():
+                    print(f"  {sv}: {cnt}")
+            if s["by_status"]:
+                print(f"\nBy status:")
+                for st, cnt in s["by_status"].items():
+                    print(f"  {st}: {cnt}")
+        else:
+            conf_parser.print_help()
 
     elif args.command == "health":
         from cos.core.health import get_health_report, format_health_report
