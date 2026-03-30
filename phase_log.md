@@ -219,3 +219,23 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - Full lineage: entity → chunk → document → artifact (3 hops)
 - Addresses Architect Notes risk #5 (provenance gaps)
 - Project version: 0.3.1 → 0.3.2
+
+### 2026-03-30 12:31 — Conflict detection added (Phase 131)
+- `cos/memory/conflicts.py` — 3 scan detectors for contradictions
+- 18th DB table: `conflicts`
+- 2 conflicts detected (duplicate concept + confidence disagreement)
+- Project version: 0.3.2 → 0.3.3
+
+### 2026-03-30 12:46 — Phases 132-140 complete — TRACK B COMPLETE
+- **Phase 132**: `cos/memory/scoring.py` — composite memory scoring (relevance+confidence+recency+frequency). 19th DB table: `memory_scores`. 49 items scored.
+- **Phase 133**: `cos/memory/pruning.py` — prune episodes, low-score items, cache. No new table.
+- **Phase 134**: `cos/memory/crossdomain.py` — cross-domain link discovery. 20th DB table: `cross_links`. 1 link discovered.
+- **Phase 135**: `cos/memory/hybrid_query.py` — vector+keyword+graph search fusion. No new table.
+- **Phase 136**: `cos/memory/snapshots.py` — memory state snapshots. 21st DB table: `memory_snapshots`.
+- **Phase 137**: `cos/memory/incremental.py` — change tracking + batch apply. 22nd DB table: `memory_changes`.
+- **Phase 138**: `cos/memory/connectors.py` — external knowledge connectors (ChEMBL/PubChem/UniProt stubs). 23rd DB table: `connector_log`.
+- **Phase 139**: `cos/memory/gaps.py` — knowledge gap detection (5 detectors). No new table.
+- **Phase 140**: `cos/memory/visualization.py` — ASCII graph, domain clusters, JSON export, memory map. No new table.
+- **TRACK B COMPLETE: 20/20 phases (121-140)**
+- COS memory system fully operational: documents, embeddings, entities, relations, temporal tags, episodic/semantic/procedural memory, knowledge graph, provenance, conflicts, scoring, pruning, cross-domain links, hybrid search, snapshots, incremental updates, external connectors, gap detection, visualization
+- Project version: 0.3.3 → 0.4.1

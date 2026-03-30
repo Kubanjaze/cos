@@ -1,6 +1,6 @@
 # COS — Cognitive Operating System: Implementation Overview
 
-**Version:** 0.3.2 | **Date:** 2026-03-30
+**Version:** 0.4.1 | **Date:** 2026-03-30
 
 ## What is COS?
 A unified system that ingests information, constructs structured memory, reasons across it, and produces decisions + executable workflows — without manual orchestration.
@@ -74,3 +74,13 @@ See `docs/ROADMAP_COS_ARCHITECT_NOTES.md` for architecture decisions and ADRs.
 | 128 | Procedural memory layer (saved workflows) | ✅ Complete |
 | 129 | Knowledge graph database integration | ✅ Complete |
 | 130 | Provenance tracking (source traceability) | ✅ Complete |
+| 131 | Conflict detection (contradictions) | ✅ Complete |
+| 132 | Memory scoring (relevance + confidence) | ✅ Complete |
+| 133 | Memory pruning + compression | ✅ Complete |
+| 134 | Cross-domain linking | ✅ Complete |
+| 135 | Hybrid query engine (vector + graph + keyword) | ✅ Complete |
+| 136 | Memory snapshot system | ✅ Complete |
+| 137 | Incremental memory updates | ✅ Complete |
+| 138 | External knowledge connectors | ✅ Complete |
+| 139 | Knowledge gap detection | ✅ Complete |
+| 140 | Memory visualization (graph + clusters) | ✅ Complete — **TRACK B COMPLETE** |

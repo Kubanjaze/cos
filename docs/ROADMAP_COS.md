@@ -71,16 +71,16 @@
 | 128 | ✅ | Procedural memory layer (saved workflows) | Standard | Can we reuse processes? |
 | 129 | ✅ | Knowledge graph database integration | Standard | Can we query relationships? |
 | 130 | ✅ | Provenance tracking (source traceability) | Micro | Can we verify outputs? |
-| 131 | Conflict detection (contradictions) | Standard | Where does knowledge disagree? |
-| 132 | Memory scoring (relevance + confidence) | Standard | What matters most? |
-| 133 | Memory pruning + compression | Micro | Can we stay efficient? |
-| 134 | Cross-domain linking | Standard | Can knowledge transfer domains? |
-| 135 | Hybrid query engine (vector + graph + keyword) | Standard | Can we retrieve deeply? |
-| 136 | Memory snapshot system | Micro | Can we freeze states in time? |
-| 137 | Incremental memory updates | Standard | Can memory evolve continuously? |
-| 138 | External knowledge connectors | Standard | Can we expand sources? |
-| 139 | Knowledge gap detection | Standard | What don't we know? |
-| 140 | Memory visualization (graph + clusters) | Standard | Can users see structure? |
+| 131 | ✅ | Conflict detection (contradictions) | Standard | Where does knowledge disagree? |
+| 132 | ✅ | Memory scoring (relevance + confidence) | Standard | What matters most? |
+| 133 | ✅ | Memory pruning + compression | Micro | Can we stay efficient? |
+| 134 | ✅ | Cross-domain linking | Standard | Can knowledge transfer domains? |
+| 135 | ✅ | Hybrid query engine (vector + graph + keyword) | Standard | Can we retrieve deeply? |
+| 136 | ✅ | Memory snapshot system | Micro | Can we freeze states in time? |
+| 137 | ✅ | Incremental memory updates | Standard | Can memory evolve continuously? |
+| 138 | ✅ | External knowledge connectors | Standard | Can we expand sources? |
+| 139 | ✅ | Knowledge gap detection | Standard | What don't we know? |
+| 140 | ✅ | Memory visualization (graph + clusters) | Standard | Can users see structure? |
 
 ---
 
