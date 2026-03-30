@@ -154,3 +154,10 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - Paragraph-based chunking (max 500 chars)
 - CLI: docs {list,show,store,search}
 - Project version: 0.2.2 → 0.2.3
+
+### 2026-03-30 10:51 — Embedding pipeline added (Phase 122)
+- `cos/memory/embeddings.py` — sentence-transformers + SQLite BLOB
+- all-MiniLM-L6-v2 (384-dim), 7 chunks embedded
+- Semantic search: cosine similarity ranking
+- 10th DB table: `chunk_embeddings`
+- Project version: 0.2.3 → 0.2.4
