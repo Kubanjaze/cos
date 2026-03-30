@@ -25,6 +25,12 @@
         .stat { text-align: center; padding: 16px; }
         .stat .value { font-size: 28px; font-weight: 700; color: #38bdf8; }
         .stat .label { font-size: 11px; color: #64748b; margin-top: 4px; }
+        .stat.clickable { cursor: pointer; border-radius: 8px; transition: background 0.15s; }
+        .stat.clickable:hover { background: #334155; }
+        .stat.clickable .value { text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 4px; }
+        .suggestion-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+        .chip { padding: 6px 14px; background: #1e3a5f; color: #38bdf8; border: 1px solid #2563eb; border-radius: 20px; font-size: 12px; cursor: pointer; transition: background 0.15s; }
+        .chip:hover { background: #2563eb; color: white; }
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
         th { text-align: left; padding: 8px; color: #64748b; border-bottom: 1px solid #334155; font-weight: 500; }
         td { padding: 8px; border-bottom: 1px solid #1e293b; }
@@ -88,8 +94,16 @@ const ConfBar = ({ value }) => (
     <div className="conf-bar"><div className="conf-bar-fill" style={{width:`${value*100}%`}}/></div>
 );
 
+// ── Stat-to-page mapping ──────────────────────────────
+const STAT_PAGES = {
+    investigations: 'dashboard', artifacts: 'memory', documents: 'memory',
+    entities: 'memory', concepts: 'memory', hypotheses: 'reasoning',
+    decisions: 'decisions', episodes: 'dashboard',
+    entity_relations: 'graph', provenance: 'memory',
+};
+
 // ── Dashboard Page ────────────────────────────────────
-const Dashboard = () => {
+const Dashboard = ({ onNavigate }) => {
     const [data, setData] = useState(null);
     useEffect(() => { api.get('/dashboard').then(setData); }, []);
     if (!data) return <div className="loading">Loading dashboard...</div>;
@@ -99,9 +113,16 @@ const Dashboard = () => {
             <div className="page-title">Dashboard</div>
             <div className="card"><h2>Knowledge Base</h2>
                 <div className="grid">
-                    {Object.entries(c).map(([k,v]) => (
-                        <div key={k} className="stat"><div className="value">{v}</div><div className="label">{k}</div></div>
-                    ))}
+                    {Object.entries(c).map(([k,v]) => {
+                        const target = STAT_PAGES[k];
+                        return (
+                            <div key={k} className={`stat ${target ? 'clickable' : ''}`}
+                                 onClick={() => target && onNavigate(target)}
+                                 title={target ? `Go to ${target}` : ''}>
+                                <div className="value">{v}</div><div className="label">{k}</div>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
             {data.notifications.length > 0 && <div className="card"><h2>Notifications</h2>
@@ -124,10 +145,14 @@ const Chat = () => {
     const [query, setQuery] = useState('');
     const [result, setResult] = useState(null);
     const [loading, setLoading] = useState(false);
-    const submit = async () => {
-        if (!query.trim()) return;
+    const [suggestions, setSuggestions] = useState([]);
+    useEffect(() => { api.get('/chat/suggestions').then(setSuggestions); }, []);
+    const submit = async (q) => {
+        const text = q || query;
+        if (!text.trim()) return;
+        setQuery(text);
         setLoading(true);
-        const r = await api.get(`/chat?q=${encodeURIComponent(query)}`);
+        const r = await api.get(`/chat?q=${encodeURIComponent(text)}`);
         setResult(r); setLoading(false);
     };
     return (
@@ -135,12 +160,25 @@ const Chat = () => {
             <div className="page-title">Chat</div>
             <div className="chat-input">
                 <input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="Ask COS anything..." />
-                <button onClick={submit} disabled={loading}>{loading?'...':'Ask'}</button>
+                <button onClick={()=>submit()} disabled={loading}>{loading?'...':'Ask'}</button>
             </div>
+            {!result && suggestions.length > 0 && <div className="card"><h2>Suggested Queries</h2>
+                <div className="suggestion-chips">
+                    {suggestions.map((s,i) => <div key={i} className="chip" onClick={()=>submit(s)}>{s}</div>)}
+                </div>
+            </div>}
             {result && <div className="card"><h2>Answers ({result.answer_count}, {result.duration_s}s)</h2>
                 {result.answers.map((a,i) => (
-                    <div key={i} className="answer"><div className="type">{a.type} — {a.source}</div><div>{a.content}</div></div>
+                    <div key={i} className="answer">
+                        <div className="type">{a.type} — {a.source} — {(a.confidence*100).toFixed(0)}% confidence</div>
+                        <div style={{whiteSpace:'pre-wrap',marginTop:4}}>{a.content}</div>
+                    </div>
                 ))}
+                <div style={{marginTop:12}}><h2>Try another</h2>
+                    <div className="suggestion-chips">
+                        {suggestions.filter(s=>s!==query).slice(0,4).map((s,i) => <div key={i} className="chip" onClick={()=>submit(s)}>{s}</div>)}
+                    </div>
+                </div>
             </div>}
         </div>
     );
@@ -377,12 +415,18 @@ const Autonomous = () => {
 // ── App ───────────────────────────────────────────────
 const App = () => {
     const [page, setPage] = useState('dashboard');
-    const pages = { dashboard: Dashboard, chat: Chat, memory: Memory, graph: Graph, reasoning: Reasoning, decisions: Decisions, workflows: Workflows, autonomous: Autonomous };
-    const Page = pages[page] || Dashboard;
+    const navigate = (p) => setPage(p);
+    const pageMap = {
+        dashboard: () => <Dashboard onNavigate={navigate} />,
+        chat: () => <Chat />, memory: () => <Memory />, graph: () => <Graph />,
+        reasoning: () => <Reasoning />, decisions: () => <Decisions />,
+        workflows: () => <Workflows />, autonomous: () => <Autonomous />,
+    };
+    const renderPage = pageMap[page] || pageMap.dashboard;
     return (
         <div className="app">
             <Sidebar page={page} setPage={setPage} />
-            <div className="main"><Page /></div>
+            <div className="main">{renderPage()}</div>
         </div>
     );
 };

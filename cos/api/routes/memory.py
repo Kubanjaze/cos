@@ -78,3 +78,9 @@ def get_scores(target_type: Optional[str] = None, limit: int = 20):
     top = memory_scorer.get_top(target_type=target_type, limit=limit)
     return [{"type": s.target_type, "id": s.target_id, "composite": s.composite_score,
              "relevance": s.relevance, "confidence": s.confidence, "frequency": s.frequency} for s in top]
+
+
+@router.get("/chat/suggestions")
+def chat_suggestions():
+    from cos.interface.chat import chat_interface
+    return chat_interface.get_suggested_queries()
