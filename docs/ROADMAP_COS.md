@@ -119,26 +119,26 @@
 
 | # | Phase | Tier | Opens |
 |---|---|---|---|
-| 161 | Workflow definition schema (DSL) | Standard | Can workflows be formalized? |
-| 162 | Workflow builder (programmatic) | Standard | Can we construct pipelines? |
-| 163 | Workflow executor (step engine) | Standard | Can workflows run reliably? |
-| 164 | Conditional branching | Micro | Can workflows adapt? |
-| 165 | Looping + iteration support | Micro | Can workflows evolve? |
-| 166 | Workflow state persistence | Standard | Can we resume runs? |
-| 167 | Scheduled workflows | Micro | Can workflows run automatically? |
-| 168 | Event-triggered workflows | Standard | Can signals trigger runs? |
-| 169 | Multi-workflow orchestration | Standard | Can workflows coordinate? |
-| 170 | Workflow templates | Standard | Can patterns be reused? |
-| 171 | Cost budget constraints | Micro | Can we control spend? |
-| 172 | Workflow analytics | Standard | Which workflows work best? |
-| 173 | Debugging + replay system | Standard | Can we inspect failures? |
-| 174 | Human-in-the-loop checkpoints | Micro | Can users intervene? |
-| 175 | Output standardization | Micro | Can results be consistent? |
-| 176 | External action hooks | Standard | Can workflows act externally? |
-| 177 | Multi-source ingestion workflows | Standard | Can inputs combine? |
-| 178 | Continuous learning workflows | Standard | Can workflows refine? |
-| 179 | Workflow marketplace (internal) | Standard | Can workflows be shared? |
-| 180 | Workflow benchmarking suite | Standard | Which pipelines perform best? |
+| 161 | ✅ | Workflow definition schema (DSL) | Standard | Can workflows be formalized? |
+| 162 | ✅ | Workflow builder (programmatic) | Standard | Can we construct pipelines? |
+| 163 | ✅ | Workflow executor (step engine) | Standard | Can workflows run reliably? |
+| 164 | ✅ | Conditional branching | Micro | Can workflows adapt? |
+| 165 | ✅ | Looping + iteration support | Micro | Can workflows evolve? |
+| 166 | ✅ | Workflow state persistence | Standard | Can we resume runs? |
+| 167 | ✅ | Scheduled workflows | Micro | Can workflows run automatically? |
+| 168 | ✅ | Event-triggered workflows | Standard | Can signals trigger runs? |
+| 169 | ✅ | Multi-workflow orchestration | Standard | Can workflows coordinate? |
+| 170 | ✅ | Workflow templates | Standard | Can patterns be reused? |
+| 171 | ✅ | Cost budget constraints | Micro | Can we control spend? |
+| 172 | ✅ | Workflow analytics | Standard | Which workflows work best? |
+| 173 | ✅ | Debugging + replay system | Standard | Can we inspect failures? |
+| 174 | ✅ | Human-in-the-loop checkpoints | Micro | Can users intervene? |
+| 175 | ✅ | Output standardization | Micro | Can results be consistent? |
+| 176 | ✅ | External action hooks | Standard | Can workflows act externally? |
+| 177 | ✅ | Multi-source ingestion workflows | Standard | Can inputs combine? |
+| 178 | ✅ | Continuous learning workflows | Standard | Can workflows refine? |
+| 179 | ✅ | Workflow marketplace (internal) | Standard | Can workflows be shared? |
+| 180 | ✅ | Workflow benchmarking suite | Standard | Which pipelines perform best? |
 
 ---
 

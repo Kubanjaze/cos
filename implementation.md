@@ -1,6 +1,6 @@
 # COS — Cognitive Operating System: Implementation Overview
 
-**Version:** 0.5.0 | **Date:** 2026-03-30
+**Version:** 0.5.1 | **Date:** 2026-03-30
 
 ## What is COS?
 A unified system that ingests information, constructs structured memory, reasons across it, and produces decisions + executable workflows — without manual orchestration.
@@ -104,3 +104,23 @@ See `docs/ROADMAP_COS_ARCHITECT_NOTES.md` for architecture decisions and ADRs.
 | 158 | Explainability layer | ✅ Complete |
 | 159 | Reasoning cost optimizer | ✅ Complete |
 | 160 | Reasoning benchmark suite | ✅ Complete — **TRACK C COMPLETE** |
+| 161 | Workflow definition schema (DSL) | ✅ Complete — **Track D begins** |
+| 162 | Workflow builder (programmatic) | ✅ Complete |
+| 163 | Workflow executor (step engine) | ✅ Complete |
+| 164 | Conditional branching | ✅ Complete |
+| 165 | Looping + iteration support | ✅ Complete |
+| 166 | Workflow state persistence | ✅ Complete |
+| 167 | Scheduled workflows | ✅ Complete |
+| 168 | Event-triggered workflows | ✅ Complete |
+| 169 | Multi-workflow orchestration | ✅ Complete |
+| 170 | Workflow templates | ✅ Complete |
+| 171 | Cost budget constraints | ✅ Complete |
+| 172 | Workflow analytics | ✅ Complete |
+| 173 | Debugging + replay system | ✅ Complete |
+| 174 | Human-in-the-loop checkpoints | ✅ Complete |
+| 175 | Output standardization | ✅ Complete |
+| 176 | External action hooks | ✅ Complete |
+| 177 | Multi-source ingestion workflows | ✅ Complete |
+| 178 | Continuous learning workflows | ✅ Complete |
+| 179 | Workflow marketplace (internal) | ✅ Complete |
+| 180 | Workflow benchmarking suite | ✅ Complete — **TRACK D COMPLETE** |
