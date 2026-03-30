@@ -174,3 +174,9 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - 82 relations: 44 belongs_to_scaffold + 38 has_activity
 - 12th DB table: `entity_relations`
 - Project version: 0.2.5 → 0.2.6
+
+### 2026-03-30 11:12 — Temporal tagging added (Phase 125)
+- `cos/memory/temporal.py` — time-aware memory annotations
+- 13th DB table: `temporal_tags`
+- Timeline view with COALESCE ordering
+- Project version: 0.2.6 → 0.2.7
