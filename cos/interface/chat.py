@@ -71,6 +71,40 @@ class ChatInterface:
         if any(w in q_lower for w in ["help", "what can", "how do i", "guide", "tutorial"]):
             results["answers"].extend(self._help_query())
 
+        # Check previous AI answers stored as concepts
+        if not results["answers"]:
+            conn = self._get_conn()
+            try:
+                rows = conn.execute(
+                    "SELECT name, definition, confidence FROM concepts WHERE domain='ai_analysis' AND definition LIKE ? LIMIT 3",
+                    (f"%{q_lower.split()[0] if q_lower.split() else ''}%",),
+                ).fetchall()
+                for name, defn, conf in rows:
+                    results["answers"].append({
+                        "type": "ai_learned", "content": defn[:300],
+                        "source": f"previous AI analysis", "confidence": conf,
+                    })
+            except Exception:
+                pass
+            conn.close()
+
+        # Check chat log for cached AI answers
+        if not results["answers"]:
+            conn = self._get_conn()
+            try:
+                rows = conn.execute(
+                    "SELECT question, answer FROM llm_chat_log WHERE question LIKE ? ORDER BY created_at DESC LIMIT 2",
+                    (f"%{q_lower[:20]}%",),
+                ).fetchall()
+                for q, a in rows:
+                    results["answers"].append({
+                        "type": "previous_ai_answer", "content": a[:300],
+                        "source": f"AI cache: '{q[:40]}'", "confidence": 0.75,
+                    })
+            except Exception:
+                pass
+            conn.close()
+
         # Fallback: hybrid search on meaningful words
         if not results["answers"]:
             from cos.memory.hybrid_query import hybrid_engine

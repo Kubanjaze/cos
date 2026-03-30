@@ -238,6 +238,9 @@ class LLMChat:
                     (log_id, q_hash, question, answer, self._model, input_tokens, output_tokens, cost, 0, ts),
                 )
 
+            # Learn from answer — store as episodic memory + concept for local reuse
+            self._learn_from_answer(question, answer, cost)
+
             new_total = total_spend + cost
             logger.info(f"LLM chat: {question[:40]} — ${cost:.6f} ({input_tokens}+{output_tokens} tokens)")
 
@@ -251,6 +254,37 @@ class LLMChat:
             logger.error(f"LLM chat error: {e}")
             return {"answer": f"API error: {str(e)[:200]}", "model": self._model,
                     "cached": False, "cost_usd": 0.0, "error": str(e)[:200]}
+
+    def _learn_from_answer(self, question: str, answer: str, cost: float):
+        """Store AI answer in COS memory for local reuse."""
+        try:
+            # Store as episodic memory
+            from cos.memory.episodic import episodic_memory
+            episodic_memory.record(
+                "llm_analysis", f"AI answered: {question[:80]}",
+                input_summary=question[:200],
+                output_summary=answer[:200],
+                cost_usd=cost,
+            )
+
+            # Store as a concept if it looks like a recommendation
+            answer_lower = answer.lower()
+            if any(w in answer_lower for w in ["recommend", "prioritize", "suggest", "should"]):
+                from cos.memory.semantic import semantic_memory
+                # Store the Q&A as a concept for local retrieval
+                concept_name = f"AI: {question[:60]}"
+                semantic_memory.define(
+                    concept_name,
+                    answer[:500],
+                    domain="ai_analysis",
+                    category="recommendation",
+                    confidence=0.75,
+                    source_ref="claude-haiku",
+                )
+                logger.info(f"Learned concept from AI: {concept_name[:40]}")
+
+        except Exception as e:
+            logger.warning(f"Learn from answer failed: {e}")
 
     def get_spend_summary(self) -> dict:
         """Get spending summary."""
