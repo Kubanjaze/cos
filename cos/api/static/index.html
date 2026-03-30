@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COS — Cognitive Operating System</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; }
+        .app { display: flex; min-height: 100vh; }
+        .sidebar { width: 220px; background: #1e293b; padding: 16px; border-right: 1px solid #334155; position: fixed; height: 100vh; overflow-y: auto; }
+        .sidebar h1 { font-size: 18px; color: #38bdf8; margin-bottom: 4px; }
+        .sidebar .version { font-size: 11px; color: #64748b; margin-bottom: 20px; }
+        .sidebar a { display: block; padding: 8px 12px; color: #94a3b8; text-decoration: none; border-radius: 6px; margin-bottom: 2px; font-size: 13px; }
+        .sidebar a:hover, .sidebar a.active { background: #334155; color: #f1f5f9; }
+        .sidebar .section { font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: 1px; margin: 16px 0 6px; }
+        .main { margin-left: 220px; flex: 1; padding: 24px; }
+        .card { background: #1e293b; border-radius: 8px; padding: 16px; margin-bottom: 16px; border: 1px solid #334155; }
+        .card h2 { font-size: 14px; color: #94a3b8; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .card h3 { font-size: 16px; color: #f1f5f9; margin-bottom: 8px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+        .stat { text-align: center; padding: 16px; }
+        .stat .value { font-size: 28px; font-weight: 700; color: #38bdf8; }
+        .stat .label { font-size: 11px; color: #64748b; margin-top: 4px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { text-align: left; padding: 8px; color: #64748b; border-bottom: 1px solid #334155; font-weight: 500; }
+        td { padding: 8px; border-bottom: 1px solid #1e293b; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+        .badge-ok { background: #064e3b; color: #34d399; }
+        .badge-warn { background: #78350f; color: #fbbf24; }
+        .badge-info { background: #1e3a5f; color: #38bdf8; }
+        .badge-high { background: #7f1d1d; color: #f87171; }
+        .conf-bar { height: 6px; border-radius: 3px; background: #334155; overflow: hidden; }
+        .conf-bar-fill { height: 100%; border-radius: 3px; background: #38bdf8; }
+        .chat-input { display: flex; gap: 8px; margin-bottom: 16px; }
+        .chat-input input { flex: 1; padding: 10px 14px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; font-size: 14px; }
+        .chat-input button { padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+        .chat-input button:hover { background: #1d4ed8; }
+        .answer { padding: 12px; background: #0f172a; border-radius: 6px; margin-bottom: 8px; border-left: 3px solid #38bdf8; }
+        .answer .type { font-size: 10px; color: #64748b; text-transform: uppercase; }
+        .node { fill: #38bdf8; }
+        .link { stroke: #475569; stroke-width: 1; }
+        .loading { color: #64748b; font-style: italic; }
+        .error { color: #f87171; }
+        .step-ok { color: #34d399; }
+        .step-fail { color: #f87171; }
+        .page-title { font-size: 22px; font-weight: 700; margin-bottom: 16px; }
+        .notification { padding: 8px 12px; border-radius: 6px; margin-bottom: 6px; font-size: 13px; }
+        .notification.warn { background: #422006; border-left: 3px solid #f59e0b; }
+        .notification.info { background: #0c4a6e; border-left: 3px solid #38bdf8; }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+
+// ── API Client ────────────────────────────────────────
+const api = {
+    get: async (path) => { const r = await fetch(`/api${path}`); return r.json(); },
+    post: async (path, body) => { const r = await fetch(`/api${path}`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) }); return r.json(); },
+};
+
+// ── Components ────────────────────────────────────────
+const Sidebar = ({ page, setPage }) => (
+    <div className="sidebar">
+        <h1>COS</h1>
+        <div className="version">Cognitive Operating System v1.0.0</div>
+        <div className="section">Overview</div>
+        <a className={page==='dashboard'?'active':''} onClick={()=>setPage('dashboard')}>Dashboard</a>
+        <a className={page==='chat'?'active':''} onClick={()=>setPage('chat')}>Chat</a>
+        <div className="section">Knowledge</div>
+        <a className={page==='memory'?'active':''} onClick={()=>setPage('memory')}>Memory</a>
+        <a className={page==='graph'?'active':''} onClick={()=>setPage('graph')}>Graph</a>
+        <div className="section">Analysis</div>
+        <a className={page==='reasoning'?'active':''} onClick={()=>setPage('reasoning')}>Reasoning</a>
+        <a className={page==='decisions'?'active':''} onClick={()=>setPage('decisions')}>Decisions</a>
+        <div className="section">Execution</div>
+        <a className={page==='workflows'?'active':''} onClick={()=>setPage('workflows')}>Workflows</a>
+        <a className={page==='autonomous'?'active':''} onClick={()=>setPage('autonomous')}>Autonomous</a>
+    </div>
+);
+
+const ConfBar = ({ value }) => (
+    <div className="conf-bar"><div className="conf-bar-fill" style={{width:`${value*100}%`}}/></div>
+);
+
+// ── Dashboard Page ────────────────────────────────────
+const Dashboard = () => {
+    const [data, setData] = useState(null);
+    useEffect(() => { api.get('/dashboard').then(setData); }, []);
+    if (!data) return <div className="loading">Loading dashboard...</div>;
+    const c = data.counts;
+    return (
+        <div>
+            <div className="page-title">Dashboard</div>
+            <div className="card"><h2>Knowledge Base</h2>
+                <div className="grid">
+                    {Object.entries(c).map(([k,v]) => (
+                        <div key={k} className="stat"><div className="value">{v}</div><div className="label">{k}</div></div>
+                    ))}
+                </div>
+            </div>
+            {data.notifications.length > 0 && <div className="card"><h2>Notifications</h2>
+                {data.notifications.map((n,i) => (
+                    <div key={i} className={`notification ${n.severity}`}>{n.message}</div>
+                ))}
+            </div>}
+            <div className="card"><h2>Recent Activity</h2>
+                <table><thead><tr><th>Time</th><th>Type</th><th>Description</th></tr></thead>
+                <tbody>{data.recent_activity.map((a,i) => (
+                    <tr key={i}><td>{a.created_at}</td><td><span className="badge badge-info">{a.type}</span></td><td>{a.description}</td></tr>
+                ))}</tbody></table>
+            </div>
+        </div>
+    );
+};
+
+// ── Chat Page ─────────────────────────────────────────
+const Chat = () => {
+    const [query, setQuery] = useState('');
+    const [result, setResult] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const submit = async () => {
+        if (!query.trim()) return;
+        setLoading(true);
+        const r = await api.get(`/chat?q=${encodeURIComponent(query)}`);
+        setResult(r); setLoading(false);
+    };
+    return (
+        <div>
+            <div className="page-title">Chat</div>
+            <div className="chat-input">
+                <input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="Ask COS anything..." />
+                <button onClick={submit} disabled={loading}>{loading?'...':'Ask'}</button>
+            </div>
+            {result && <div className="card"><h2>Answers ({result.answer_count}, {result.duration_s}s)</h2>
+                {result.answers.map((a,i) => (
+                    <div key={i} className="answer"><div className="type">{a.type} — {a.source}</div><div>{a.content}</div></div>
+                ))}
+            </div>}
+        </div>
+    );
+};
+
+// ── Memory Page ───────────────────────────────────────
+const Memory = () => {
+    const [entities, setEntities] = useState([]);
+    const [concepts, setConcepts] = useState([]);
+    const [gaps, setGaps] = useState(null);
+    useEffect(() => {
+        api.get('/entities').then(setEntities);
+        api.get('/concepts').then(setConcepts);
+        api.get('/gaps').then(setGaps);
+    }, []);
+    return (
+        <div>
+            <div className="page-title">Memory</div>
+            <div className="card"><h2>Concepts ({concepts.length})</h2>
+                <table><thead><tr><th>Name</th><th>Domain</th><th>Category</th><th>Confidence</th></tr></thead>
+                <tbody>{concepts.map(c => (
+                    <tr key={c.id}><td>{c.name}</td><td>{c.domain}</td><td>{c.category}</td>
+                    <td><ConfBar value={c.confidence}/> {(c.confidence*100).toFixed(0)}%</td></tr>
+                ))}</tbody></table>
+            </div>
+            <div className="card"><h2>Entities ({entities.length})</h2>
+                <table><thead><tr><th>Name</th><th>Type</th><th>Confidence</th></tr></thead>
+                <tbody>{entities.slice(0,20).map(e => (
+                    <tr key={e.id}><td>{e.name}</td><td><span className="badge badge-info">{e.type}</span></td>
+                    <td>{(e.confidence*100).toFixed(0)}%</td></tr>
+                ))}</tbody></table>
+                {entities.length > 20 && <div style={{color:'#64748b',marginTop:8}}>...and {entities.length-20} more</div>}
+            </div>
+            {gaps && <div className="card"><h2>Knowledge Gaps ({gaps.total_gaps})</h2>
+                <div className="grid">
+                    <div className="stat"><div className="value">{gaps.unlinked_entities}</div><div className="label">Unlinked Entities</div></div>
+                    <div className="stat"><div className="value">{gaps.low_confidence_concepts}</div><div className="label">Low Confidence</div></div>
+                    <div className="stat"><div className="value">{gaps.orphan_chunks}</div><div className="label">Orphan Chunks</div></div>
+                    <div className="stat"><div className="value">{gaps.sparse_domains}</div><div className="label">Sparse Domains</div></div>
+                </div>
+            </div>}
+        </div>
+    );
+};
+
+// ── Graph Page ────────────────────────────────────────
+const Graph = () => {
+    const [entity, setEntity] = useState('benz');
+    const [depth, setDepth] = useState(1);
+    const [graph, setGraph] = useState(null);
+    const [stats, setStats] = useState(null);
+    const load = () => api.get(`/graph/${entity}?depth=${depth}`).then(setGraph);
+    useEffect(() => { load(); api.get('/graph/stats').then(setStats); }, []);
+    return (
+        <div>
+            <div className="page-title">Knowledge Graph</div>
+            {stats && <div className="card"><h2>Graph Stats</h2>
+                <div className="grid">
+                    <div className="stat"><div className="value">{stats.nodes}</div><div className="label">Nodes</div></div>
+                    <div className="stat"><div className="value">{stats.edges}</div><div className="label">Edges</div></div>
+                    <div className="stat"><div className="value">{stats.avg_degree}</div><div className="label">Avg Degree</div></div>
+                    <div className="stat"><div className="value">{stats.components}</div><div className="label">Components</div></div>
+                </div>
+            </div>}
+            <div className="card"><h2>Subgraph Explorer</h2>
+                <div className="chat-input" style={{marginBottom:12}}>
+                    <input value={entity} onChange={e=>setEntity(e.target.value)} placeholder="Entity name" />
+                    <select value={depth} onChange={e=>setDepth(+e.target.value)} style={{background:'#0f172a',color:'#e2e8f0',border:'1px solid #334155',borderRadius:6,padding:'8px'}}>
+                        <option value={1}>Depth 1</option><option value={2}>Depth 2</option><option value={3}>Depth 3</option>
+                    </select>
+                    <button onClick={load}>Explore</button>
+                </div>
+                {graph && <div>
+                    <div style={{marginBottom:8}}>Center: <strong>{graph.center}</strong> — {graph.node_count} nodes, {graph.edge_count} edges</div>
+                    <table><thead><tr><th>Source</th><th>Relation</th><th>Target</th></tr></thead>
+                    <tbody>{(graph.edges||[]).slice(0,30).map((e,i) => (
+                        <tr key={i}><td>{e.source}</td><td><span className="badge badge-ok">{e.relation}</span></td><td>{e.target}</td></tr>
+                    ))}</tbody></table>
+                </div>}
+            </div>
+        </div>
+    );
+};
+
+// ── Reasoning Page ────────────────────────────────────
+const Reasoning = () => {
+    const [hyps, setHyps] = useState([]);
+    const [insights, setInsights] = useState([]);
+    const [uncertainty, setUncertainty] = useState(null);
+    useEffect(() => {
+        api.get('/hypotheses').then(setHyps);
+        api.get('/insights').then(setInsights);
+        api.get('/uncertainty').then(setUncertainty);
+    }, []);
+    return (
+        <div>
+            <div className="page-title">Reasoning</div>
+            {uncertainty && <div className="card"><h2>System Uncertainty</h2>
+                <div className="grid">
+                    <div className="stat"><div className="value">{(uncertainty.overall_confidence*100).toFixed(0)}%</div><div className="label">Overall Confidence</div></div>
+                    <div className="stat"><div className="value">{(uncertainty.concept_avg_confidence*100).toFixed(0)}%</div><div className="label">Concept Avg</div></div>
+                    <div className="stat"><div className="value">{(uncertainty.entity_avg_confidence*100).toFixed(0)}%</div><div className="label">Entity Avg</div></div>
+                </div>
+            </div>}
+            <div className="card"><h2>Hypotheses ({hyps.length})</h2>
+                <table><thead><tr><th>Status</th><th>Confidence</th><th>Statement</th></tr></thead>
+                <tbody>{hyps.map(h => (
+                    <tr key={h.id}><td><span className="badge badge-info">{h.status}</span></td>
+                    <td><ConfBar value={h.confidence}/> {(h.confidence*100).toFixed(0)}%</td>
+                    <td>{h.statement.substring(0,80)}</td></tr>
+                ))}</tbody></table>
+            </div>
+            <div className="card"><h2>Insights ({insights.length})</h2>
+                {insights.map(i => (
+                    <div key={i.id} className="answer"><div className="type">{i.type} — novelty {(i.novelty*100).toFixed(0)}%</div><div>{i.description}</div></div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// ── Decisions Page ────────────────────────────────────
+const Decisions = () => {
+    const [decs, setDecs] = useState([]);
+    const [actions, setActions] = useState([]);
+    useEffect(() => {
+        api.get('/decisions').then(setDecs);
+        api.get('/decisions/board/view').then(setActions);
+    }, []);
+    return (
+        <div>
+            <div className="page-title">Decisions</div>
+            <div className="card"><h2>Decision Board</h2>
+                <table><thead><tr><th>Title</th><th>Confidence</th><th>Status</th><th>Actions</th><th>Risks</th></tr></thead>
+                <tbody>{decs.map(d => (
+                    <tr key={d.id}><td>{d.title}</td>
+                    <td><ConfBar value={d.confidence}/> {(d.confidence*100).toFixed(0)}%</td>
+                    <td><span className="badge badge-info">{d.status}</span></td>
+                    <td>{d.actions}</td><td>{d.risks}</td></tr>
+                ))}</tbody></table>
+            </div>
+        </div>
+    );
+};
+
+// ── Workflows Page ────────────────────────────────────
+const Workflows = () => {
+    const [templates, setTemplates] = useState([]);
+    const [runs, setRuns] = useState([]);
+    const [stats, setStats] = useState(null);
+    useEffect(() => {
+        api.get('/workflows/templates').then(setTemplates);
+        api.get('/workflows/runs').then(setRuns);
+        api.get('/workflows/stats').then(setStats);
+    }, []);
+    return (
+        <div>
+            <div className="page-title">Workflows</div>
+            {stats && <div className="card"><h2>Stats</h2>
+                <div className="grid">
+                    <div className="stat"><div className="value">{stats.total_runs}</div><div className="label">Total Runs</div></div>
+                    <div className="stat"><div className="value">{stats.completed}</div><div className="label">Completed</div></div>
+                    <div className="stat"><div className="value">{(stats.success_rate*100).toFixed(0)}%</div><div className="label">Success Rate</div></div>
+                </div>
+            </div>}
+            <div className="card"><h2>Templates ({templates.length})</h2>
+                <table><thead><tr><th>Name</th><th>Steps</th><th>Description</th></tr></thead>
+                <tbody>{templates.map(t => (
+                    <tr key={t.name}><td><strong>{t.name}</strong></td><td>{t.steps}</td><td>{t.description}</td></tr>
+                ))}</tbody></table>
+            </div>
+            <div className="card"><h2>Recent Runs</h2>
+                <table><thead><tr><th>ID</th><th>Workflow</th><th>Status</th><th>Duration</th></tr></thead>
+                <tbody>{runs.map(r => (
+                    <tr key={r.id}><td>{r.id}</td><td>{r.workflow}</td>
+                    <td><span className={`badge ${r.status==='completed'?'badge-ok':'badge-high'}`}>{r.status}</span></td>
+                    <td>{r.duration_s}s</td></tr>
+                ))}</tbody></table>
+            </div>
+        </div>
+    );
+};
+
+// ── Autonomous Page ───────────────────────────────────
+const Autonomous = () => {
+    const [question, setQuestion] = useState('');
+    const [result, setResult] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [monitor, setMonitor] = useState(null);
+    const [priorities, setPriorities] = useState([]);
+    useEffect(() => {
+        api.get('/auto/monitor').then(setMonitor);
+        api.get('/auto/priorities').then(setPriorities);
+    }, []);
+    const run = async () => {
+        if (!question.trim()) return;
+        setLoading(true);
+        const r = await api.post('/auto/investigate', { question });
+        setResult(r); setLoading(false);
+    };
+    return (
+        <div>
+            <div className="page-title">Autonomous Investigation</div>
+            {monitor && <div className="card"><h2>System Monitor: {monitor.overall}</h2>
+                <table><thead><tr><th>Check</th><th>Status</th></tr></thead>
+                <tbody>{monitor.checks.map((c,i) => (
+                    <tr key={i}><td>{c.check}</td><td><span className={`badge ${c.status==='ok'?'badge-ok':'badge-warn'}`}>{c.status}</span></td></tr>
+                ))}</tbody></table>
+            </div>}
+            <div className="card"><h2>Run Investigation</h2>
+                <div className="chat-input">
+                    <input value={question} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>e.key==='Enter'&&run()} placeholder="Enter investigation question..." />
+                    <button onClick={run} disabled={loading}>{loading?'Running...':'Investigate'}</button>
+                </div>
+                {result && <div>
+                    <div style={{marginBottom:12}}>Status: <span className={`badge ${result.status==='complete'?'badge-ok':'badge-high'}`}>{result.status}</span> — {result.duration_s}s, {(result.success_rate*100).toFixed(0)}% success</div>
+                    <table><thead><tr><th>Phase</th><th>Action</th><th>Status</th></tr></thead>
+                    <tbody>{result.steps.map((s,i) => (
+                        <tr key={i}><td><strong>{s.phase}</strong></td><td>{s.action||'—'}</td>
+                        <td><span className={s.status==='ok'?'step-ok':'step-fail'}>{s.status==='ok'?'OK':'!!'}</span></td></tr>
+                    ))}</tbody></table>
+                </div>}
+            </div>
+            {priorities.length > 0 && <div className="card"><h2>Priority Queue</h2>
+                <table><thead><tr><th>Priority</th><th>Task</th><th>Description</th></tr></thead>
+                <tbody>{priorities.map((p,i) => (
+                    <tr key={i}><td><strong>{p.priority.toFixed(1)}</strong></td><td>{p.task}</td><td>{p.description}</td></tr>
+                ))}</tbody></table>
+            </div>}
+        </div>
+    );
+};
+
+// ── App ───────────────────────────────────────────────
+const App = () => {
+    const [page, setPage] = useState('dashboard');
+    const pages = { dashboard: Dashboard, chat: Chat, memory: Memory, graph: Graph, reasoning: Reasoning, decisions: Decisions, workflows: Workflows, autonomous: Autonomous };
+    const Page = pages[page] || Dashboard;
+    return (
+        <div className="app">
+            <Sidebar page={page} setPage={setPage} />
+            <div className="main"><Page /></div>
+        </div>
+    );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
