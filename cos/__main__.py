@@ -96,6 +96,15 @@ def main():
     status_p.add_argument("task_id", help="Task ID (full or partial)")
     task_sub.add_parser("run", help="Process pending tasks")
 
+    embed_parser = sub.add_parser("embed", help="Embedding pipeline")
+    embed_sub = embed_parser.add_subparsers(dest="embed_command")
+    embed_doc_p = embed_sub.add_parser("doc", help="Embed a document's chunks")
+    embed_doc_p.add_argument("doc_id")
+    embed_search_p = embed_sub.add_parser("search", help="Semantic search")
+    embed_search_p.add_argument("query")
+    embed_search_p.add_argument("--top-k", type=int, default=5)
+    embed_sub.add_parser("stats", help="Embedding statistics")
+
     sub.add_parser("health", help="System health dashboard")
 
     docs_parser = sub.add_parser("docs", help="Document store")
@@ -344,6 +353,28 @@ def main():
             print(f"Processed {n} tasks.")
         else:
             task_parser.print_help()
+
+    elif args.command == "embed":
+        from cos.memory.embeddings import embedding_pipeline
+        if args.embed_command == "doc":
+            n = embedding_pipeline.embed_document(args.doc_id)
+            print(f"Embedded {n} chunks for document {args.doc_id}")
+        elif args.embed_command == "search":
+            results = embedding_pipeline.search(args.query, top_k=args.top_k)
+            if not results:
+                print("No results.")
+            else:
+                print(f"Semantic search: '{args.query}' (top {len(results)})\n")
+                for i, r in enumerate(results, 1):
+                    print(f"  {i}. [sim={r['similarity']:.4f}] {r['document_id'][:12]}")
+                    print(f"     {r['text'][:100]}...")
+                    print()
+        elif args.embed_command == "stats":
+            s = embedding_pipeline.stats()
+            print(f"Embeddings: {s['total_embeddings']} chunks across {s['documents_embedded']} documents")
+            print(f"Model: {s['model']}")
+        else:
+            embed_parser.print_help()
 
     elif args.command == "docs":
         from cos.memory.documents import document_store
