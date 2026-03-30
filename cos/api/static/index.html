@@ -144,44 +144,84 @@ const Dashboard = ({ onNavigate }) => {
     );
 };
 
-// ── Chat Page ─────────────────────────────────────────
+// ── Chat Page (dual mode: local + AI) ─────────────────
 const Chat = () => {
     const [query, setQuery] = useState('');
     const [result, setResult] = useState(null);
+    const [aiResult, setAiResult] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [mode, setMode] = useState('local');
     const [suggestions, setSuggestions] = useState([]);
-    useEffect(() => { api.get('/chat/suggestions').then(setSuggestions); }, []);
+    const [spend, setSpend] = useState(null);
+    useEffect(() => {
+        api.get('/chat/suggestions').then(setSuggestions);
+        api.get('/llm/spend').then(setSpend);
+    }, []);
     const submit = async (q) => {
         const text = q || query;
         if (!text.trim()) return;
-        setQuery(text);
-        setLoading(true);
-        const r = await api.get(`/chat?q=${encodeURIComponent(text)}`);
-        setResult(r); setLoading(false);
+        setQuery(text); setLoading(true);
+        setResult(null); setAiResult(null);
+        if (mode === 'ai') {
+            const r = await api.get(`/llm/ask?q=${encodeURIComponent(text)}`);
+            setAiResult(r);
+            api.get('/llm/spend').then(setSpend);
+        } else {
+            const r = await api.get(`/chat?q=${encodeURIComponent(text)}`);
+            setResult(r);
+        }
+        setLoading(false);
     };
     return (
         <div>
-            <div className="page-title">Chat</div>
-            <div className="chat-input">
-                <input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="Ask COS anything..." />
-                <button onClick={()=>submit()} disabled={loading}>{loading?'...':'Ask'}</button>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+                <div className="page-title" style={{marginBottom:0}}>Chat</div>
+                <div style={{display:'flex',gap:4}}>
+                    <button onClick={()=>setMode('local')} style={{padding:'6px 14px',borderRadius:6,border:'1px solid #334155',
+                        background:mode==='local'?'#2563eb':'transparent',color:mode==='local'?'white':'#94a3b8',cursor:'pointer',fontSize:12}}>
+                        Local (free)</button>
+                    <button onClick={()=>setMode('ai')} style={{padding:'6px 14px',borderRadius:6,border:'1px solid #334155',
+                        background:mode==='ai'?'#7c3aed':'transparent',color:mode==='ai'?'white':'#94a3b8',cursor:'pointer',fontSize:12}}>
+                        AI (Claude)</button>
+                </div>
             </div>
-            {!result && suggestions.length > 0 && <div className="card"><h2>Suggested Queries</h2>
+            {mode==='ai' && spend && <div style={{fontSize:11,color:'#64748b',marginBottom:8}}>
+                Budget: ${spend.remaining?.toFixed(4)} remaining of ${spend.budget?.toFixed(2)} | {spend.api_queries} API calls, {spend.cached_queries} cached | Model: {spend.model}
+            </div>}
+            <div className="chat-input">
+                <input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()}
+                       placeholder={mode==='ai'?'Ask Claude about your data...':'Ask COS anything...'} />
+                <button onClick={()=>submit()} disabled={loading} style={{background:mode==='ai'?'#7c3aed':'#2563eb',color:'white',border:'none',borderRadius:6,padding:'10px 20px',cursor:'pointer'}}>
+                    {loading?'...':mode==='ai'?'Ask AI':'Ask'}</button>
+            </div>
+            {!result && !aiResult && suggestions.length > 0 && <div className="card"><h2>Suggested Queries</h2>
                 <div className="suggestion-chips">
                     {suggestions.map((s,i) => <div key={i} className="chip" onClick={()=>submit(s)}>{s}</div>)}
                 </div>
             </div>}
-            {result && <div className="card"><h2>Answers ({result.answer_count}, {result.duration_s}s)</h2>
+            {result && <div className="card"><h2>Local Answers ({result.answer_count}, {result.duration_s}s)</h2>
                 {result.answers.map((a,i) => (
                     <div key={i} className="answer">
                         <div className="type">{a.type} — {a.source} — {(a.confidence*100).toFixed(0)}% confidence</div>
                         <div style={{whiteSpace:'pre-wrap',marginTop:4}}>{a.content}</div>
                     </div>
                 ))}
-                <div style={{marginTop:12}}><h2>Try another</h2>
-                    <div className="suggestion-chips">
-                        {suggestions.filter(s=>s!==query).slice(0,4).map((s,i) => <div key={i} className="chip" onClick={()=>submit(s)}>{s}</div>)}
-                    </div>
+            </div>}
+            {aiResult && <div className="card" style={{borderColor:aiResult.budget_exceeded?'#f87171':'#7c3aed'}}>
+                <h2 style={{color:'#a78bfa'}}>Claude AI {aiResult.cached?'(cached — free)':''}</h2>
+                {aiResult.budget_exceeded ? (
+                    <div style={{color:'#f87171',padding:12}}>{aiResult.answer}</div>
+                ) : (
+                    <div style={{whiteSpace:'pre-wrap',lineHeight:1.6,padding:4}}>{aiResult.answer}</div>
+                )}
+                {!aiResult.budget_exceeded && <div style={{marginTop:10,fontSize:11,color:'#64748b',borderTop:'1px solid #334155',paddingTop:8}}>
+                    {aiResult.cached?'Cached (free)': `Cost: $${aiResult.cost_usd?.toFixed(6)} | ${aiResult.input_tokens}+${aiResult.output_tokens} tokens`}
+                    {' | '}Budget remaining: ${aiResult.budget_remaining?.toFixed(4)}
+                </div>}
+            </div>}
+            {(result || aiResult) && <div style={{marginTop:12}}>
+                <div className="suggestion-chips">
+                    {suggestions.filter(s=>s!==query).slice(0,4).map((s,i) => <div key={i} className="chip" onClick={()=>submit(s)}>{s}</div>)}
                 </div>
             </div>}
         </div>

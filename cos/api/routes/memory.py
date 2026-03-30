@@ -84,3 +84,15 @@ def get_scores(target_type: Optional[str] = None, limit: int = 20):
 def chat_suggestions():
     from cos.interface.chat import chat_interface
     return chat_interface.get_suggested_queries()
+
+
+@router.get("/llm/ask")
+def llm_ask(q: str):
+    from cos.interface.llm_chat import llm_chat
+    return llm_chat.ask(q)
+
+
+@router.get("/llm/spend")
+def llm_spend():
+    from cos.interface.llm_chat import llm_chat
+    return llm_chat.get_spend_summary()
