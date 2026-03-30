@@ -1,6 +1,6 @@
 # COS — Cognitive Operating System: Implementation Overview
 
-**Version:** 0.2.5 | **Date:** 2026-03-29
+**Version:** 0.2.6 | **Date:** 2026-03-29
 
 ## What is COS?
 A unified system that ingests information, constructs structured memory, reasons across it, and produces decisions + executable workflows — without manual orchestration.
@@ -67,3 +67,4 @@ See `docs/ROADMAP_COS_ARCHITECT_NOTES.md` for architecture decisions and ADRs.
 | 121 | Document store (raw + parsed text) | ✅ Complete — **Track B begins** |
 | 122 | Embedding pipeline (chunking + indexing) | ✅ Complete |
 | 123 | Structured entity extraction | ✅ Complete |
+| 124 | Relationship extractor (entity links) | ✅ Complete |

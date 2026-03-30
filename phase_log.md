@@ -168,3 +168,9 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - Provenance chain: entity → chunk → doc → artifact
 - 11th DB table: `entities`
 - Project version: 0.2.4 → 0.2.5
+
+### 2026-03-30 11:02 — Relationship extractor added (Phase 124)
+- `cos/memory/relations.py` — typed entity edges
+- 82 relations: 44 belongs_to_scaffold + 38 has_activity
+- 12th DB table: `entity_relations`
+- Project version: 0.2.5 → 0.2.6

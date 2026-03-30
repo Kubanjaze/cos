@@ -64,7 +64,7 @@
 | 121 | ✅ | Document store (raw + parsed text) | Micro | Can we persist sources? |
 | 122 | ✅ | Embedding pipeline (chunking + indexing) | Standard | Can we retrieve effectively? |
 | 123 | ✅ | Structured entity extraction | Standard | Can we move beyond text? |
-| 124 | Relationship extractor (entity links) | Standard | Can we form graphs? |
+| 124 | ✅ | Relationship extractor (entity links) | Standard | Can we form graphs? |
 | 125 | Temporal tagging (time-aware memory) | Micro | Can we track evolution? |
 | 126 | Episodic memory layer (runs + outputs) | Standard | Can we recall past work? |
 | 127 | Semantic memory layer (concept definitions) | Standard | Can we store knowledge cleanly? |
