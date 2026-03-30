@@ -407,6 +407,37 @@ def main():
     wf_sub.add_parser("marketplace", help="Browse workflow marketplace")
     wf_sub.add_parser("stats", help="Workflow statistics")
 
+    # ── Track E: Decision Engine ──────────────────────────
+    dec_parser = sub.add_parser("decide", help="Decision engine")
+    dec_sub = dec_parser.add_subparsers(dest="dec_command")
+    dec_create_p = dec_sub.add_parser("create", help="Create a decision")
+    dec_create_p.add_argument("title")
+    dec_create_p.add_argument("recommendation")
+    dec_create_p.add_argument("--confidence", type=float, default=0.5)
+    dec_create_p.add_argument("--investigation", default="default")
+    dec_sub.add_parser("list", help="List decisions")
+    dec_show_p = dec_sub.add_parser("show", help="Show decision detail")
+    dec_show_p.add_argument("decision_id")
+    dec_sub.add_parser("generate-actions", help="Generate actions from reasoning")
+    dec_sub.add_parser("actions", help="List proposed actions")
+    dec_risk_p = dec_sub.add_parser("assess-risk", help="Assess risks for a decision")
+    dec_risk_p.add_argument("decision_id")
+    dec_tradeoff_p = dec_sub.add_parser("tradeoffs", help="Analyze tradeoffs")
+    dec_tradeoff_p.add_argument("decision_id")
+    dec_missing_p = dec_sub.add_parser("missing", help="Find missing evidence")
+    dec_missing_p.add_argument("decision_id")
+    dec_outcome_p = dec_sub.add_parser("outcome", help="Record decision outcome")
+    dec_outcome_p.add_argument("decision_id")
+    dec_outcome_p.add_argument("outcome")
+    dec_outcome_p.add_argument("--type", default="unknown")
+    dec_sub.add_parser("calibration", help="Calibration report")
+    dec_sub.add_parser("board", help="Scenario board (compare decisions)")
+    dec_audit_p = dec_sub.add_parser("audit", help="Decision audit trail")
+    dec_audit_p.add_argument("decision_id")
+    dec_sub.add_parser("resources", help="Resource allocation suggestions")
+    dec_sub.add_parser("benchmark", help="Decision quality benchmark")
+    dec_sub.add_parser("stats", help="Decision statistics")
+
     sub.add_parser("health", help="System health dashboard")
 
     docs_parser = sub.add_parser("docs", help="Document store")
@@ -1611,6 +1642,136 @@ def main():
             print(f"  Success rate:{es['success_rate']:.0%}" if es['total_runs'] > 0 else "  Success rate: —")
         else:
             wf_parser.print_help()
+
+    # ── Track E: Decision Handlers ──────────────────────────
+    elif args.command == "decide":
+        if args.dec_command == "create":
+            from cos.decision.schema import decision_store
+            did = decision_store.create(args.title, args.recommendation,
+                                         confidence=args.confidence, investigation_id=args.investigation)
+            print(f"Decision created: {did} — {args.title}")
+        elif args.dec_command == "list":
+            from cos.decision.schema import decision_store
+            decs = decision_store.list_decisions()
+            if not decs:
+                print("No decisions.")
+            else:
+                for d in decs:
+                    print(f"  [{d.status:>10}] conf={d.confidence:.2f}  {d.title[:50]}  ({d.id})")
+        elif args.dec_command == "show":
+            from cos.decision.schema import decision_store
+            d = decision_store.get(args.decision_id)
+            if not d:
+                print(f"Decision not found: {args.decision_id}")
+            else:
+                print(f"Decision: {d.title}")
+                print(f"  ID:             {d.id}")
+                print(f"  Status:         {d.status}")
+                print(f"  Confidence:     {d.confidence:.2f}")
+                print(f"  Recommendation: {d.recommendation}")
+                print(f"  Actions:        {len(d.actions)}")
+                print(f"  Risks:          {len(d.risks)}")
+                print(f"  Invalidations:  {len(d.invalidation_conditions)}")
+        elif args.dec_command == "generate-actions":
+            from cos.decision.actions import action_generator
+            actions = action_generator.generate()
+            print(f"Generated {len(actions)} actions:")
+            for a in actions:
+                print(f"  #{a['rank']} [{a['type']:>16}] priority={a['priority']:.3f} — {a['description'][:55]}")
+        elif args.dec_command == "actions":
+            from cos.decision.actions import action_generator
+            for a in action_generator.list_actions():
+                print(f"  [{a['status']:>8}] priority={a['priority']:.3f} {a['type']:>16} — {a['description'][:50]}")
+        elif args.dec_command == "assess-risk":
+            from cos.decision.risk import risk_assessor
+            risks = risk_assessor.assess(args.decision_id)
+            print(f"Risk assessment ({len(risks)} risks):")
+            for r in risks:
+                if "error" in r:
+                    print(f"  Error: {r['error']}")
+                else:
+                    print(f"  [{r['impact']:>6}] {r['type']}: {r['description'][:55]}")
+                    print(f"          Mitigation: {r['mitigation'][:55]}")
+                    if r.get("invalidation"):
+                        print(f"          Invalidates if: {r['invalidation'][:55]}")
+        elif args.dec_command == "tradeoffs":
+            from cos.decision.tradeoffs import tradeoff_analyzer
+            result = tradeoff_analyzer.analyze(args.decision_id)
+            if "error" in result:
+                print(f"Error: {result['error']}")
+            else:
+                print(f"Tradeoff Analysis: {result['title']}")
+                print(f"  Pros: {', '.join(result['pros'][:3])}")
+                print(f"  Cons: {', '.join(result['cons'][:3])}")
+                print(f"  Confidence: {result['original_confidence']:.2f} → {result['adjusted_confidence']:.2f}")
+                print(f"  Recommendation: {result['recommendation']}")
+        elif args.dec_command == "missing":
+            from cos.decision.missing_evidence import missing_evidence_detector
+            gaps = missing_evidence_detector.detect(args.decision_id)
+            print(f"Missing evidence ({len(gaps)} gaps):")
+            for g in gaps:
+                if "error" in g:
+                    print(f"  Error: {g['error']}")
+                else:
+                    print(f"  [{g['severity']:>6}] {g['type']}: {g['description'][:60]}")
+                    print(f"          → {g['suggestion']}")
+        elif args.dec_command == "outcome":
+            from cos.decision.tracking import decision_tracker
+            try:
+                oid = decision_tracker.record_outcome(args.decision_id, args.outcome, outcome_type=args.type)
+                print(f"Outcome recorded: {oid}")
+            except ValueError as e:
+                print(f"Error: {e}")
+        elif args.dec_command == "calibration":
+            from cos.decision.tracking import decision_tracker
+            report = decision_tracker.calibration_report()
+            print(f"Decision Calibration:")
+            for k, v in report.items():
+                print(f"  {k}: {v}")
+        elif args.dec_command == "board":
+            from cos.decision.tracking import decision_tracker
+            board = decision_tracker.scenario_board()
+            if not board:
+                print("No proposed decisions.")
+            else:
+                print(f"{'Title':>35} {'Conf':>6} {'Actions':>7} {'Risks':>6}")
+                for d in board:
+                    print(f"{d['title'][:35]:>35} {d['confidence']:>6.2f} {d['actions']:>7} {d['risks']:>6}")
+        elif args.dec_command == "audit":
+            from cos.decision.tracking import decision_tracker
+            trail = decision_tracker.get_audit_trail(args.decision_id)
+            if not trail:
+                print(f"No audit trail for {args.decision_id}")
+            else:
+                for entry in trail:
+                    print(f"  {entry['created_at']} [{entry['actor']}] {entry['action']}: {entry['details'][:50]}")
+        elif args.dec_command == "resources":
+            from cos.decision.tracking import decision_tracker
+            allocs = decision_tracker.allocate_resources()
+            if not allocs:
+                print("No decisions to allocate resources to.")
+            else:
+                for a in allocs:
+                    print(f"  {a['title'][:30]:>30} conf={a['confidence']:.2f} → {a['suggested_effort']}")
+        elif args.dec_command == "benchmark":
+            from cos.decision.benchmark import decision_benchmark
+            result = decision_benchmark.run()
+            print(f"Decision Benchmark (composite={result['composite']:.4f}):")
+            print(f"  Total decisions: {result['total_decisions']}")
+            print(f"  Avg confidence:  {result['avg_confidence']:.3f}")
+            print(f"  With risks:      {result['with_risks']}")
+            print(f"  With evidence:   {result['with_evidence']}")
+            print(f"  Outcome accuracy:{result['outcome_accuracy']:.3f}")
+            for k, v in result["breakdown"].items():
+                print(f"    {k}: {v:.4f}")
+        elif args.dec_command == "stats":
+            from cos.decision.schema import decision_store
+            s = decision_store.stats()
+            print(f"Decisions: {s['total']} total, avg confidence={s['avg_confidence']:.3f}")
+            for st, cnt in s["by_status"].items():
+                print(f"  {st}: {cnt}")
+        else:
+            dec_parser.print_help()
 
     elif args.command == "health":
         from cos.core.health import get_health_report, format_health_report
