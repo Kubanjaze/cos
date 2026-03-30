@@ -210,3 +210,12 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - CLI: `python -m cos graph {neighbors,path,subgraph,query,stats}`
 - 44 nodes, 82 edges, 1 connected component, avg degree 3.73
 - Project version: 0.3.0 → 0.3.1
+
+### 2026-03-30 12:18 — Provenance tracking added (Phase 130)
+- `cos/memory/provenance.py` — source traceability for all outputs
+- 17th DB table: `provenance` with unique constraint + 5 indexes
+- register/trace/chain/get_lineage/backfill/stats
+- Backfill reconstructed 134 links from existing FK relationships
+- Full lineage: entity → chunk → document → artifact (3 hops)
+- Addresses Architect Notes risk #5 (provenance gaps)
+- Project version: 0.3.1 → 0.3.2
