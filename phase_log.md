@@ -161,3 +161,10 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - Semantic search: cosine similarity ranking
 - 10th DB table: `chunk_embeddings`
 - Project version: 0.2.3 → 0.2.4
+
+### 2026-03-30 10:57 — Entity extraction added (Phase 123)
+- `cos/memory/entities.py` — rule-based regex NER
+- 44 compound entities from compounds.csv
+- Provenance chain: entity → chunk → doc → artifact
+- 11th DB table: `entities`
+- Project version: 0.2.4 → 0.2.5
