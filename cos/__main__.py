@@ -96,6 +96,15 @@ def main():
     status_p.add_argument("task_id", help="Task ID (full or partial)")
     task_sub.add_parser("run", help="Process pending tasks")
 
+    rel_parser = sub.add_parser("relations", help="Relationship extraction")
+    rel_sub = rel_parser.add_subparsers(dest="rel_command")
+    rel_extract_p = rel_sub.add_parser("extract", help="Extract relations from document")
+    rel_extract_p.add_argument("doc_id")
+    rel_list_p = rel_sub.add_parser("list", help="List relations")
+    rel_list_p.add_argument("--entity", default=None)
+    rel_list_p.add_argument("--type", default=None)
+    rel_sub.add_parser("stats", help="Relation statistics")
+
     ent_parser = sub.add_parser("entities", help="Entity extraction")
     ent_sub = ent_parser.add_subparsers(dest="ent_command")
     ent_extract_p = ent_sub.add_parser("extract", help="Extract entities from document")
@@ -361,6 +370,27 @@ def main():
             print(f"Processed {n} tasks.")
         else:
             task_parser.print_help()
+
+    elif args.command == "relations":
+        from cos.memory.relations import relation_extractor
+        if args.rel_command == "extract":
+            n = relation_extractor.extract_from_document(args.doc_id)
+            print(f"Extracted {n} relations from {args.doc_id}")
+        elif args.rel_command == "list":
+            rels = relation_extractor.get_relations(entity_name=args.entity, relation_type=args.type)
+            if not rels:
+                print("No relations found.")
+            else:
+                print(f"{'Source':>20} {'Relation':>22} {'Target':>15}")
+                for r in rels[:20]:
+                    print(f"{r.source_entity:>20} {r.relation_type:>22} {r.target_value:>15}")
+        elif args.rel_command == "stats":
+            s = relation_extractor.stats()
+            print(f"Relations: {s['total']} total")
+            for t, c in s["by_type"].items():
+                print(f"  {t}: {c}")
+        else:
+            rel_parser.print_help()
 
     elif args.command == "entities":
         from cos.memory.entities import entity_extractor
