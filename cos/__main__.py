@@ -371,6 +371,42 @@ def main():
     reason_sub.add_parser("benchmark", help="Run reasoning benchmark")
     reason_sub.add_parser("benchmark-history", help="Benchmark run history")
 
+    # ── Track D: Workflow + Automation ──────────────────────
+    wf_parser = sub.add_parser("wf", help="Workflow operations")
+    wf_sub = wf_parser.add_subparsers(dest="wf_command")
+    wf_def_p = wf_sub.add_parser("define", help="Define a workflow")
+    wf_def_p.add_argument("name")
+    wf_def_p.add_argument("steps_json", help="JSON array of steps")
+    wf_def_p.add_argument("--description", default="")
+    wf_def_p.add_argument("--domain", default="general")
+    wf_sub.add_parser("list", help="List workflows")
+    wf_run_p = wf_sub.add_parser("run", help="Execute a workflow")
+    wf_run_p.add_argument("name")
+    wf_run_p.add_argument("--investigation", default="default")
+    wf_sub.add_parser("runs", help="List workflow runs")
+    wf_replay_p = wf_sub.add_parser("replay", help="Replay/inspect a run")
+    wf_replay_p.add_argument("run_id")
+    wf_sub.add_parser("templates", help="List workflow templates")
+    wf_inst_p = wf_sub.add_parser("instantiate", help="Create workflow from template")
+    wf_inst_p.add_argument("template_name")
+    wf_inst_p.add_argument("--name", default=None)
+    wf_sched_p = wf_sub.add_parser("schedule", help="Schedule a workflow")
+    wf_sched_p.add_argument("workflow_name")
+    wf_sched_p.add_argument("cron_expr")
+    wf_sub.add_parser("schedules", help="List schedules")
+    wf_budget_p = wf_sub.add_parser("budget", help="Set cost budget")
+    wf_budget_p.add_argument("target_type")
+    wf_budget_p.add_argument("target_id")
+    wf_budget_p.add_argument("amount", type=float)
+    wf_sub.add_parser("budgets", help="List budgets")
+    wf_sub.add_parser("analytics", help="Workflow performance report")
+    wf_sub.add_parser("benchmark", help="Benchmark workflows")
+    wf_sub.add_parser("hooks", help="List action hooks")
+    wf_hook_p = wf_sub.add_parser("hook", help="Execute a hook")
+    wf_hook_p.add_argument("hook_name")
+    wf_sub.add_parser("marketplace", help="Browse workflow marketplace")
+    wf_sub.add_parser("stats", help="Workflow statistics")
+
     sub.add_parser("health", help="System health dashboard")
 
     docs_parser = sub.add_parser("docs", help="Document store")
@@ -1451,6 +1487,130 @@ def main():
                     print(f"{r['composite']:>10.4f} {r['quality']:>8.4f} ${r['cost']:>7.4f} {r['latency']:>7.3f}s {r['created_at']}")
         else:
             reason_parser.print_help()
+
+    # ── Track D: Workflow Handlers ──────────────────────────
+    elif args.command == "wf":
+        if args.wf_command == "define":
+            import json as _json
+            from cos.workflow.schema import workflow_schema
+            try:
+                steps = _json.loads(args.steps_json)
+                wid = workflow_schema.define(args.name, steps, description=args.description, domain=args.domain)
+                print(f"Workflow defined: {wid} — {args.name} ({len(steps)} steps)")
+            except Exception as e:
+                print(f"Error: {e}")
+        elif args.wf_command == "list":
+            from cos.workflow.schema import workflow_schema
+            wfs = workflow_schema.list_workflows()
+            if not wfs:
+                print("No workflows defined.")
+            else:
+                for w in wfs:
+                    print(f"  {w['name']:>25} v{w['version']} ({w['domain']}) — {w['description'][:40]}")
+        elif args.wf_command == "run":
+            from cos.workflow.executor import workflow_executor
+            try:
+                result = workflow_executor.execute(args.name, investigation_id=args.investigation)
+                print(f"\nWorkflow: {result['workflow']} — {result['status']} ({result['duration_s']:.3f}s)")
+                for s in result["steps"]:
+                    status = "OK" if s["status"] == "completed" else s["status"].upper()
+                    print(f"  {s.get('name','step'):>20} [{status}] {s['duration_s']:.3f}s")
+            except Exception as e:
+                print(f"Error: {e}")
+        elif args.wf_command == "runs":
+            from cos.workflow.executor import workflow_executor
+            runs = workflow_executor.list_runs()
+            if not runs:
+                print("No workflow runs.")
+            else:
+                for r in runs:
+                    print(f"  {r['id']}  {r['workflow']:>20}  {r['status']:>10}  {r['duration_s']:.3f}s  {r['started']}")
+        elif args.wf_command == "replay":
+            from cos.workflow.analytics import workflow_analytics
+            result = workflow_analytics.replay_run(args.run_id)
+            if "error" in result and isinstance(result["error"], str) and result.get("run_id") is None:
+                print(f"Error: {result['error']}")
+            else:
+                print(f"Run: {result.get('run_id','')} — {result.get('workflow','')} ({result.get('status','')})")
+                for s in result.get("steps", []):
+                    print(f"  Step {s.get('step','')}: {s.get('name','')} [{s.get('status','')}] {s.get('duration_s',0):.3f}s")
+        elif args.wf_command == "templates":
+            from cos.workflow.templates import template_registry
+            for t in template_registry.list_templates():
+                print(f"  {t['name']:>20} ({t['steps']} steps) — {t['description']}")
+        elif args.wf_command == "instantiate":
+            from cos.workflow.templates import template_registry
+            try:
+                wid = template_registry.instantiate(args.template_name, workflow_name=args.name)
+                print(f"Workflow created from template: {wid}")
+            except Exception as e:
+                print(f"Error: {e}")
+        elif args.wf_command == "schedule":
+            from cos.workflow.scheduler import workflow_scheduler
+            sid = workflow_scheduler.schedule(args.workflow_name, args.cron_expr)
+            print(f"Scheduled: {sid}")
+        elif args.wf_command == "schedules":
+            from cos.workflow.scheduler import workflow_scheduler
+            for s in workflow_scheduler.list_schedules():
+                print(f"  {s['workflow']:>20} [{s['type']}] {'enabled' if s['enabled'] else 'disabled'} {s.get('cron','') or s.get('event','')}")
+        elif args.wf_command == "budget":
+            from cos.workflow.budget import budget_manager
+            bid = budget_manager.set_budget(args.target_type, args.target_id, args.amount)
+            print(f"Budget set: {bid} — {args.target_type}/{args.target_id} = ${args.amount:.2f}")
+        elif args.wf_command == "budgets":
+            from cos.workflow.budget import budget_manager
+            for b in budget_manager.list_budgets():
+                print(f"  {b['type']:>12}/{b['id'][:12]} budget=${b['budget']:.2f} spent=${b['spent']:.4f} [{b['status']}]")
+        elif args.wf_command == "analytics":
+            from cos.workflow.analytics import workflow_analytics
+            report = workflow_analytics.performance_report()
+            if not report["workflows"]:
+                print("No workflow data yet.")
+            else:
+                print(f"{'Workflow':>25} {'Runs':>5} {'OK%':>6} {'Avg(s)':>7}")
+                for w in report["workflows"]:
+                    print(f"{w['name']:>25} {w['runs']:>5} {w['success_rate']:>5.0%} {w['avg_duration_s']:>7.3f}")
+        elif args.wf_command == "benchmark":
+            from cos.workflow.analytics import workflow_analytics
+            result = workflow_analytics.benchmark_workflows()
+            if not result["benchmarks"]:
+                print("No benchmarks yet.")
+            else:
+                for b in result["benchmarks"]:
+                    print(f"  {b['workflow']:>25} composite={b['composite']:.4f} sr={b['success_rate']:.0%} avg={b['avg_duration_s']:.3f}s")
+        elif args.wf_command == "hooks":
+            from cos.workflow.hooks import hook_registry
+            for h in hook_registry.list_hooks():
+                print(f"  {h}")
+        elif args.wf_command == "hook":
+            from cos.workflow.hooks import hook_registry
+            result = hook_registry.execute(args.hook_name)
+            print(f"Hook '{args.hook_name}': {result['status']}")
+            if result.get("result"):
+                for k, v in result["result"].items():
+                    print(f"  {k}: {v}")
+        elif args.wf_command == "marketplace":
+            from cos.workflow.hooks import workflow_marketplace
+            items = workflow_marketplace.list_available()
+            if not items:
+                print("No items in marketplace.")
+            else:
+                for i in items:
+                    print(f"  [{i['type']:>8}] {i['name']:>25} — {i['description'][:40]}")
+        elif args.wf_command == "stats":
+            from cos.workflow.executor import workflow_executor
+            from cos.workflow.schema import workflow_schema
+            from cos.workflow.templates import template_registry
+            ws = workflow_schema.stats()
+            es = workflow_executor.stats()
+            ts_stat = template_registry.stats()
+            print(f"Workflow System:")
+            print(f"  Definitions: {ws['total_workflows']}")
+            print(f"  Templates:   {ts_stat['total_templates']}")
+            print(f"  Runs:        {es['total_runs']} (ok={es['completed']}, fail={es['failed']})")
+            print(f"  Success rate:{es['success_rate']:.0%}" if es['total_runs'] > 0 else "  Success rate: —")
+        else:
+            wf_parser.print_help()
 
     elif args.command == "health":
         from cos.core.health import get_health_report, format_health_report
