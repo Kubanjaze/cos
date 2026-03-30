@@ -69,7 +69,7 @@
 | 126 | ✅ | Episodic memory layer (runs + outputs) | Standard | Can we recall past work? |
 | 127 | ✅ | Semantic memory layer (concept definitions) | Standard | Can we store knowledge cleanly? |
 | 128 | ✅ | Procedural memory layer (saved workflows) | Standard | Can we reuse processes? |
-| 129 | Knowledge graph database integration | Standard | Can we query relationships? |
+| 129 | ✅ | Knowledge graph database integration | Standard | Can we query relationships? |
 | 130 | Provenance tracking (source traceability) | Micro | Can we verify outputs? |
 | 131 | Conflict detection (contradictions) | Standard | Where does knowledge disagree? |
 | 132 | Memory scoring (relevance + confidence) | Standard | What matters most? |

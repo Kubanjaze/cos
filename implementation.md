@@ -1,6 +1,6 @@
 # COS — Cognitive Operating System: Implementation Overview
 
-**Version:** 0.3.0 | **Date:** 2026-03-30
+**Version:** 0.3.1 | **Date:** 2026-03-30
 
 ## What is COS?
 A unified system that ingests information, constructs structured memory, reasons across it, and produces decisions + executable workflows — without manual orchestration.
@@ -72,3 +72,4 @@ See `docs/ROADMAP_COS_ARCHITECT_NOTES.md` for architecture decisions and ADRs.
 | 126 | Episodic memory layer (runs + outputs) | ✅ Complete |
 | 127 | Semantic memory layer (concept definitions) | ✅ Complete |
 | 128 | Procedural memory layer (saved workflows) | ✅ Complete |
+| 129 | Knowledge graph database integration | ✅ Complete |

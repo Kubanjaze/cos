@@ -203,3 +203,10 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - CLI: `python -m cos procedures {define,list,get,run,update,delete,stats}`
 - **3-kind memory model complete**: episodic (126) + semantic (127) + procedural (128)
 - Project version: 0.2.9 → 0.3.0
+
+### 2026-03-30 12:20 — Knowledge graph added (Phase 129)
+- `cos/memory/graph.py` — unified graph query layer over entities + relations
+- No new DB tables — BFS-based neighbors, path, subgraph, connected_components
+- CLI: `python -m cos graph {neighbors,path,subgraph,query,stats}`
+- 44 nodes, 82 edges, 1 connected component, avg degree 3.73
+- Project version: 0.3.0 → 0.3.1
