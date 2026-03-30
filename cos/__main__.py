@@ -200,6 +200,24 @@ def main():
     proc_del_p.add_argument("name")
     proc_sub.add_parser("stats", help="Procedure statistics")
 
+    graph_parser = sub.add_parser("graph", help="Knowledge graph queries")
+    graph_sub = graph_parser.add_subparsers(dest="graph_command")
+    graph_nb_p = graph_sub.add_parser("neighbors", help="Find neighbors of an entity")
+    graph_nb_p.add_argument("entity", help="Entity name")
+    graph_nb_p.add_argument("--relation", default=None, help="Filter by relation type")
+    graph_path_p = graph_sub.add_parser("path", help="Find shortest path between entities")
+    graph_path_p.add_argument("source", help="Source entity")
+    graph_path_p.add_argument("target", help="Target entity")
+    graph_path_p.add_argument("--max-depth", type=int, default=5)
+    graph_sg_p = graph_sub.add_parser("subgraph", help="Extract neighborhood subgraph")
+    graph_sg_p.add_argument("entity", help="Center entity")
+    graph_sg_p.add_argument("--depth", type=int, default=2)
+    graph_query_p = graph_sub.add_parser("query", help="Query graph with filters")
+    graph_query_p.add_argument("--entity-type", default=None)
+    graph_query_p.add_argument("--relation", default=None)
+    graph_query_p.add_argument("--target", default=None)
+    graph_sub.add_parser("stats", help="Graph statistics")
+
     sub.add_parser("health", help="System health dashboard")
 
     docs_parser = sub.add_parser("docs", help="Document store")
@@ -754,6 +772,59 @@ def main():
                     print(f"  {cat}: {cnt}")
         else:
             proc_parser.print_help()
+
+    elif args.command == "graph":
+        from cos.memory.graph import knowledge_graph
+        if args.graph_command == "neighbors":
+            results = knowledge_graph.neighbors(args.entity, relation_type=args.relation)
+            if not results:
+                print(f"No neighbors found for '{args.entity}'")
+            else:
+                print(f"Neighbors of '{args.entity}' ({len(results)}):\n")
+                for r in results:
+                    print(f"  {r['direction']:>8} —[{r['relation']}]→ {r['entity']} (conf={r['confidence']:.2f})")
+        elif args.graph_command == "path":
+            path = knowledge_graph.path(args.source, args.target, max_depth=args.max_depth)
+            if path is None:
+                print(f"No path found: {args.source} → {args.target} (max depth={args.max_depth})")
+            else:
+                print(f"Path ({len(path)} hops): {args.source} → {args.target}\n")
+                for i, step in enumerate(path, 1):
+                    print(f"  {i}. {step['from']} —[{step['relation']}]→ {step['to']}")
+        elif args.graph_command == "subgraph":
+            sub_g = knowledge_graph.subgraph(args.entity, depth=args.depth)
+            print(f"Subgraph: center='{sub_g['center']}', depth={sub_g['depth']}")
+            print(f"  Nodes: {sub_g['node_count']}")
+            print(f"  Edges: {sub_g['edge_count']}")
+            if sub_g['nodes']:
+                print(f"\n  Nodes:")
+                for n in sub_g['nodes'][:20]:
+                    print(f"    {n}")
+            if sub_g['edges']:
+                print(f"\n  Edges:")
+                for e in sub_g['edges'][:20]:
+                    print(f"    {e['source']} —[{e['relation']}]→ {e['target']}")
+        elif args.graph_command == "query":
+            results = knowledge_graph.query(
+                entity_type=args.entity_type, relation_type=args.relation,
+                target=args.target,
+            )
+            if not results:
+                print("No results.")
+            else:
+                print(f"Graph query results ({len(results)}):\n")
+                for r in results:
+                    print(f"  {r['source']:>20} —[{r['relation']}]→ {r['target']}")
+        elif args.graph_command == "stats":
+            s = knowledge_graph.stats()
+            print(f"Knowledge Graph Statistics")
+            print(f"  Nodes:              {s['nodes']}")
+            print(f"  Edges:              {s['edges']}")
+            print(f"  Avg degree:         {s['avg_degree']}")
+            print(f"  Components:         {s['components']}")
+            print(f"  Largest component:  {s['largest_component']} nodes")
+        else:
+            graph_parser.print_help()
 
     elif args.command == "health":
         from cos.core.health import get_health_report, format_health_report
