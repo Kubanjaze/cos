@@ -31,15 +31,15 @@ def get_dashboard():
     except Exception:
         pass
 
-    # Notifications
+    # Notifications (with links to detail pages)
     notifications = []
     try:
         conflicts = conn.execute("SELECT COUNT(*) FROM conflicts WHERE status='open'").fetchone()[0]
         if conflicts > 0:
-            notifications.append({"severity": "warn", "message": f"{conflicts} unresolved conflict(s)"})
+            notifications.append({"severity": "warn", "message": f"{conflicts} unresolved conflict(s)", "link": "conflicts"})
         low_conf = conn.execute("SELECT COUNT(*) FROM concepts WHERE confidence < 0.5").fetchone()[0]
         if low_conf > 0:
-            notifications.append({"severity": "info", "message": f"{low_conf} low-confidence concept(s)"})
+            notifications.append({"severity": "info", "message": f"{low_conf} low-confidence concept(s)", "link": "low-confidence"})
     except Exception:
         pass
 
@@ -100,6 +100,40 @@ def list_documents():
 def provenance_stats():
     from cos.memory.provenance import provenance_tracker
     return provenance_tracker.stats()
+
+
+@router.post("/ingest/path")
+def ingest_by_path(file_path: str = "", investigation_id: str = "default"):
+    """Ingest a local file by path."""
+    from cos.core.ingestion import ingest_file
+    try:
+        artifact = ingest_file(file_path, investigation_id=investigation_id)
+        return {"status": "success", "id": artifact.id, "uri": artifact.uri,
+                "type": artifact.type, "size": artifact.size_bytes, "hash": artifact.hash[:16]}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@router.get("/conflicts")
+def list_conflicts():
+    from cos.memory.conflicts import conflict_detector
+    conflicts = conflict_detector.list_conflicts()
+    return [{"id": c.id, "type": c.conflict_type, "description": c.description,
+             "severity": c.severity, "status": c.status, "resolution": c.resolution,
+             "item_a": f"{c.item_a_type}/{c.item_a_id}", "item_b": f"{c.item_b_type}/{c.item_b_id}",
+             "created_at": c.created_at} for c in conflicts]
+
+
+@router.get("/low-confidence")
+def low_confidence_concepts():
+    from cos.core.config import settings
+    import sqlite3
+    conn = sqlite3.connect(settings.db_path)
+    rows = conn.execute(
+        "SELECT id, name, definition, domain, confidence FROM concepts WHERE confidence < 0.5 ORDER BY confidence"
+    ).fetchall()
+    conn.close()
+    return [{"id": r[0], "name": r[1], "definition": r[2], "domain": r[3], "confidence": r[4]} for r in rows]
 
 
 @router.get("/provenance/recent")
