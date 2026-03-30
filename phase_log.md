@@ -186,3 +186,11 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - 14th DB table: `episodes`
 - record/recall/get_recent/stats
 - Project version: 0.2.7 → 0.2.8
+
+### 2026-03-30 11:28 — Semantic memory added (Phase 127)
+- `cos/memory/semantic.py` — concept definitions ("what we know")
+- 15th DB table: `concepts` with 5 indexes (incl. unique name+domain)
+- define/get/search/update/list_concepts/stats + upsert semantics
+- CLI: `python -m cos concepts {define,list,get,search,update,stats}`
+- Completes 2/3 of MemoryItem kinds (episodic + semantic; procedural in Phase 128)
+- Project version: 0.2.8 → 0.2.9
