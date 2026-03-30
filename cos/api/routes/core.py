@@ -70,3 +70,47 @@ def get_investigation(inv_id: str):
 def get_cost():
     from cos.core.cost import cost_tracker
     return cost_tracker.get_summary()
+
+
+@router.get("/artifacts")
+def list_artifacts():
+    from cos.core.ingestion import list_artifacts
+    return list_artifacts(None)
+
+
+@router.get("/episodes")
+def list_episodes():
+    from cos.memory.episodic import episodic_memory
+    eps = episodic_memory.recall(limit=50)
+    return [{"id": e.id, "type": e.episode_type, "description": e.description,
+             "investigation_id": e.investigation_id, "duration_s": e.duration_s,
+             "cost_usd": e.cost_usd, "created_at": e.created_at} for e in eps]
+
+
+@router.get("/documents")
+def list_documents():
+    from cos.memory.documents import document_store
+    docs = document_store.list_documents()
+    return [{"id": d.id, "title": d.title, "artifact_id": d.artifact_id,
+             "chunks": d.chunk_count, "chars": d.char_count,
+             "investigation_id": d.investigation_id, "created_at": d.created_at} for d in docs]
+
+
+@router.get("/provenance/stats")
+def provenance_stats():
+    from cos.memory.provenance import provenance_tracker
+    return provenance_tracker.stats()
+
+
+@router.get("/provenance/recent")
+def provenance_recent():
+    from cos.core.config import settings
+    import sqlite3
+    conn = sqlite3.connect(settings.db_path)
+    rows = conn.execute(
+        "SELECT target_type, target_id, source_type, source_id, operation, agent, created_at "
+        "FROM provenance ORDER BY created_at DESC LIMIT 30"
+    ).fetchall()
+    conn.close()
+    return [{"target_type": r[0], "target_id": r[1], "source_type": r[2],
+             "source_id": r[3], "operation": r[4], "agent": r[5], "created_at": r[6]} for r in rows]

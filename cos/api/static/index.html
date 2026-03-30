@@ -94,12 +94,12 @@ const ConfBar = ({ value }) => (
     <div className="conf-bar"><div className="conf-bar-fill" style={{width:`${value*100}%`}}/></div>
 );
 
-// ── Stat-to-page mapping ──────────────────────────────
+// ── Stat-to-page mapping (page:tab) ──────────────────
 const STAT_PAGES = {
-    investigations: 'dashboard', artifacts: 'memory', documents: 'memory',
-    entities: 'memory', concepts: 'memory', hypotheses: 'reasoning',
-    decisions: 'decisions', episodes: 'dashboard',
-    entity_relations: 'graph', provenance: 'memory',
+    investigations: 'investigations', artifacts: 'artifacts', documents: 'documents',
+    entities: 'entities', concepts: 'concepts', hypotheses: 'reasoning',
+    decisions: 'decisions', episodes: 'episodes',
+    entity_relations: 'graph', provenance: 'provenance',
 };
 
 // ── Dashboard Page ────────────────────────────────────
@@ -412,6 +412,134 @@ const Autonomous = () => {
     );
 };
 
+// ── Dedicated Data Pages ──────────────────────────────
+const Entities = () => {
+    const [data, setData] = useState([]);
+    useEffect(() => { api.get('/entities').then(setData); }, []);
+    return (<div>
+        <div className="page-title">Entities ({data.length})</div>
+        <div className="card">
+            <table><thead><tr><th>Name</th><th>Type</th><th>Confidence</th><th>Document</th></tr></thead>
+            <tbody>{data.map(e => (
+                <tr key={e.id}><td><strong>{e.name}</strong></td>
+                <td><span className="badge badge-info">{e.type}</span></td>
+                <td><ConfBar value={e.confidence}/> {(e.confidence*100).toFixed(0)}%</td>
+                <td style={{fontSize:11,color:'#64748b'}}>{e.document_id}</td></tr>
+            ))}</tbody></table>
+        </div>
+    </div>);
+};
+
+const Concepts = () => {
+    const [data, setData] = useState([]);
+    useEffect(() => { api.get('/concepts').then(setData); }, []);
+    return (<div>
+        <div className="page-title">Concepts ({data.length})</div>
+        <div className="card">
+            <table><thead><tr><th>Name</th><th>Domain</th><th>Category</th><th>Confidence</th><th>Definition</th></tr></thead>
+            <tbody>{data.map(c => (
+                <tr key={c.id}><td><strong>{c.name}</strong></td><td>{c.domain}</td><td>{c.category}</td>
+                <td><ConfBar value={c.confidence}/> {(c.confidence*100).toFixed(0)}%</td>
+                <td style={{fontSize:12,color:'#94a3b8'}}>{c.definition.substring(0,80)}...</td></tr>
+            ))}</tbody></table>
+        </div>
+    </div>);
+};
+
+const Investigations = () => {
+    const [data, setData] = useState([]);
+    useEffect(() => { api.get('/investigations').then(setData); }, []);
+    return (<div>
+        <div className="page-title">Investigations ({data.length})</div>
+        <div className="card">
+            {data.length === 0 ? <div className="loading">No investigations.</div> :
+            <table><thead><tr><th>ID</th><th>Title</th><th>Domain</th><th>Status</th><th>Created</th></tr></thead>
+            <tbody>{data.map(inv => (
+                <tr key={inv.id}><td>{inv.id}</td><td><strong>{inv.title}</strong></td>
+                <td>{inv.domain||'—'}</td>
+                <td><span className={`badge ${inv.status==='active'?'badge-ok':'badge-info'}`}>{inv.status}</span></td>
+                <td>{inv.created_at}</td></tr>
+            ))}</tbody></table>}
+        </div>
+    </div>);
+};
+
+const Artifacts = () => {
+    const [data, setData] = useState([]);
+    useEffect(() => { api.get('/artifacts').then(setData); }, []);
+    return (<div>
+        <div className="page-title">Artifacts ({data.length})</div>
+        <div className="card">
+            {data.length === 0 ? <div className="loading">No artifacts.</div> :
+            <table><thead><tr><th>ID</th><th>Type</th><th>Size</th><th>Investigation</th><th>Created</th></tr></thead>
+            <tbody>{data.map(a => (
+                <tr key={a.id}><td>{a.id.substring(0,12)}</td><td><span className="badge badge-info">{a.type}</span></td>
+                <td>{a.size_bytes} bytes</td><td>{a.investigation_id}</td><td>{a.created_at}</td></tr>
+            ))}</tbody></table>}
+        </div>
+    </div>);
+};
+
+const Documents = () => {
+    const [data, setData] = useState([]);
+    useEffect(() => { api.get('/documents').then(setData); }, []);
+    return (<div>
+        <div className="page-title">Documents ({data.length})</div>
+        <div className="card">
+            {data.length === 0 ? <div className="loading">No documents.</div> :
+            <table><thead><tr><th>ID</th><th>Title</th><th>Chunks</th><th>Characters</th><th>Investigation</th></tr></thead>
+            <tbody>{data.map(d => (
+                <tr key={d.id}><td>{d.id}</td><td><strong>{d.title}</strong></td>
+                <td>{d.chunks}</td><td>{d.chars.toLocaleString()}</td><td>{d.investigation_id}</td></tr>
+            ))}</tbody></table>}
+        </div>
+    </div>);
+};
+
+const Episodes = () => {
+    const [data, setData] = useState([]);
+    useEffect(() => { api.get('/episodes').then(setData); }, []);
+    return (<div>
+        <div className="page-title">Episodes ({data.length})</div>
+        <div className="card">
+            {data.length === 0 ? <div className="loading">No episodes.</div> :
+            <table><thead><tr><th>Time</th><th>Type</th><th>Description</th><th>Duration</th><th>Cost</th></tr></thead>
+            <tbody>{data.map(e => (
+                <tr key={e.id}><td>{e.created_at}</td>
+                <td><span className="badge badge-info">{e.type}</span></td>
+                <td>{e.description}</td><td>{e.duration_s}s</td>
+                <td>{e.cost_usd > 0 ? `$${e.cost_usd.toFixed(4)}` : '—'}</td></tr>
+            ))}</tbody></table>}
+        </div>
+    </div>);
+};
+
+const Provenance = () => {
+    const [data, setData] = useState([]);
+    const [stats, setStats] = useState(null);
+    useEffect(() => { api.get('/provenance/recent').then(setData); api.get('/provenance/stats').then(setStats); }, []);
+    return (<div>
+        <div className="page-title">Provenance</div>
+        {stats && <div className="card"><h2>Stats</h2>
+            <div className="grid">
+                <div className="stat"><div className="value">{stats.total}</div><div className="label">Total Links</div></div>
+                {Object.entries(stats.by_operation||{}).map(([op,cnt]) => (
+                    <div key={op} className="stat"><div className="value">{cnt}</div><div className="label">{op}</div></div>
+                ))}
+            </div>
+        </div>}
+        <div className="card"><h2>Recent Links ({data.length})</h2>
+            <table><thead><tr><th>Target</th><th>Source</th><th>Operation</th><th>Agent</th></tr></thead>
+            <tbody>{data.map((p,i) => (
+                <tr key={i}><td>{p.target_type}/{p.target_id.substring(0,12)}</td>
+                <td>{p.source_type}/{p.source_id.substring(0,12)}</td>
+                <td><span className="badge badge-ok">{p.operation}</span></td>
+                <td style={{fontSize:11,color:'#64748b'}}>{p.agent||'—'}</td></tr>
+            ))}</tbody></table>
+        </div>
+    </div>);
+};
+
 // ── App ───────────────────────────────────────────────
 const App = () => {
     const [page, setPage] = useState('dashboard');
@@ -421,6 +549,10 @@ const App = () => {
         chat: () => <Chat />, memory: () => <Memory />, graph: () => <Graph />,
         reasoning: () => <Reasoning />, decisions: () => <Decisions />,
         workflows: () => <Workflows />, autonomous: () => <Autonomous />,
+        entities: () => <Entities />, concepts: () => <Concepts />,
+        investigations: () => <Investigations />, artifacts: () => <Artifacts />,
+        documents: () => <Documents />, episodes: () => <Episodes />,
+        provenance: () => <Provenance />,
     };
     const renderPage = pageMap[page] || pageMap.dashboard;
     return (
