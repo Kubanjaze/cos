@@ -96,6 +96,17 @@ def main():
     status_p.add_argument("task_id", help="Task ID (full or partial)")
     task_sub.add_parser("run", help="Process pending tasks")
 
+    temp_parser = sub.add_parser("temporal", help="Temporal tagging")
+    temp_sub = temp_parser.add_subparsers(dest="temp_command")
+    temp_tag_p = temp_sub.add_parser("tag", help="Add temporal tag")
+    temp_tag_p.add_argument("target_type", help="entity, document, or relation")
+    temp_tag_p.add_argument("target_id")
+    temp_tag_p.add_argument("--context", required=True, help="Time context description")
+    temp_tag_p.add_argument("--time-point", default=None)
+    temp_tag_p.add_argument("--investigation", default="default")
+    temp_timeline_p = temp_sub.add_parser("timeline", help="Show investigation timeline")
+    temp_timeline_p.add_argument("investigation_id")
+
     rel_parser = sub.add_parser("relations", help="Relationship extraction")
     rel_sub = rel_parser.add_subparsers(dest="rel_command")
     rel_extract_p = rel_sub.add_parser("extract", help="Extract relations from document")
@@ -370,6 +381,24 @@ def main():
             print(f"Processed {n} tasks.")
         else:
             task_parser.print_help()
+
+    elif args.command == "temporal":
+        from cos.memory.temporal import temporal_tagger
+        if args.temp_command == "tag":
+            tid = temporal_tagger.tag(args.target_type, args.target_id, args.context,
+                                       time_point=args.time_point, investigation_id=args.investigation)
+            print(f"Temporal tag created: {tid}")
+        elif args.temp_command == "timeline":
+            events = temporal_tagger.get_timeline(args.investigation_id)
+            if not events:
+                print(f"No temporal events for '{args.investigation_id}'")
+            else:
+                print(f"Timeline for '{args.investigation_id}' ({len(events)} events):\n")
+                for e in events:
+                    tp = e["time_point"] or e["created_at"]
+                    print(f"  {tp}  [{e['target_type']}] {e['target_id'][:16]} — {e['time_context']}")
+        else:
+            temp_parser.print_help()
 
     elif args.command == "relations":
         from cos.memory.relations import relation_extractor
