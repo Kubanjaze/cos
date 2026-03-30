@@ -218,6 +218,28 @@ def main():
     graph_query_p.add_argument("--target", default=None)
     graph_sub.add_parser("stats", help="Graph statistics")
 
+    prov_parser = sub.add_parser("provenance", help="Provenance tracking")
+    prov_sub = prov_parser.add_subparsers(dest="prov_command")
+    prov_trace_p = prov_sub.add_parser("trace", help="Trace sources of an output")
+    prov_trace_p.add_argument("target_type", help="Type (entity, relation, chunk, document)")
+    prov_trace_p.add_argument("target_id", help="Target ID")
+    prov_chain_p = prov_sub.add_parser("chain", help="Find outputs derived from a source")
+    prov_chain_p.add_argument("source_type", help="Type (artifact, document, chunk)")
+    prov_chain_p.add_argument("source_id", help="Source ID")
+    prov_lineage_p = prov_sub.add_parser("lineage", help="Full lineage to root")
+    prov_lineage_p.add_argument("target_type")
+    prov_lineage_p.add_argument("target_id")
+    prov_reg_p = prov_sub.add_parser("register", help="Register a provenance link")
+    prov_reg_p.add_argument("target_type")
+    prov_reg_p.add_argument("target_id")
+    prov_reg_p.add_argument("source_type")
+    prov_reg_p.add_argument("source_id")
+    prov_reg_p.add_argument("--operation", required=True)
+    prov_reg_p.add_argument("--agent", default="")
+    prov_reg_p.add_argument("--investigation", default="default")
+    prov_sub.add_parser("backfill", help="Reconstruct provenance from existing data")
+    prov_sub.add_parser("stats", help="Provenance statistics")
+
     sub.add_parser("health", help="System health dashboard")
 
     docs_parser = sub.add_parser("docs", help="Document store")
@@ -825,6 +847,57 @@ def main():
             print(f"  Largest component:  {s['largest_component']} nodes")
         else:
             graph_parser.print_help()
+
+    elif args.command == "provenance":
+        from cos.memory.provenance import provenance_tracker
+        if args.prov_command == "trace":
+            links = provenance_tracker.trace(args.target_type, args.target_id)
+            if not links:
+                print(f"No provenance found for {args.target_type}/{args.target_id}")
+            else:
+                print(f"Provenance for {args.target_type}/{args.target_id} ({len(links)} sources):\n")
+                for l in links:
+                    print(f"  ← {l.source_type}/{l.source_id[:16]} [{l.operation}] by {l.agent or '—'}")
+        elif args.prov_command == "chain":
+            links = provenance_tracker.chain(args.source_type, args.source_id)
+            if not links:
+                print(f"No outputs derived from {args.source_type}/{args.source_id}")
+            else:
+                print(f"Outputs from {args.source_type}/{args.source_id} ({len(links)} derived):\n")
+                for l in links:
+                    print(f"  → {l.target_type}/{l.target_id[:16]} [{l.operation}] by {l.agent or '—'}")
+        elif args.prov_command == "lineage":
+            steps = provenance_tracker.get_lineage(args.target_type, args.target_id)
+            if not steps:
+                print(f"No lineage found for {args.target_type}/{args.target_id}")
+            else:
+                print(f"Lineage for {args.target_type}/{args.target_id} ({len(steps)} hops):\n")
+                for i, s in enumerate(steps):
+                    print(f"  {i+1}. {s['target_type']}/{s['target_id'][:16]} ← {s['source_type']}/{s['source_id'][:16]} [{s['operation']}]")
+                print(f"\n  Root: {steps[-1]['source_type']}/{steps[-1]['source_id'][:16]}")
+        elif args.prov_command == "register":
+            lid = provenance_tracker.register(
+                args.target_type, args.target_id, args.source_type, args.source_id,
+                operation=args.operation, agent=args.agent,
+                investigation_id=args.investigation,
+            )
+            print(f"Provenance registered: {lid}")
+        elif args.prov_command == "backfill":
+            n = provenance_tracker.backfill()
+            print(f"Provenance backfill: {n} links created from existing data")
+        elif args.prov_command == "stats":
+            s = provenance_tracker.stats()
+            print(f"Provenance: {s['total']} links")
+            if s["by_operation"]:
+                print(f"\nBy operation:")
+                for op, cnt in s["by_operation"].items():
+                    print(f"  {op}: {cnt}")
+            if s["by_target_type"]:
+                print(f"\nBy target type:")
+                for t, cnt in s["by_target_type"].items():
+                    print(f"  {t}: {cnt}")
+        else:
+            prov_parser.print_help()
 
     elif args.command == "health":
         from cos.core.health import get_health_report, format_health_report
