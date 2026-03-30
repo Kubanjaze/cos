@@ -83,11 +83,14 @@ const Sidebar = ({ page, setPage }) => (
         <a className={page==='memory'?'active':''} onClick={()=>setPage('memory')}>Memory</a>
         <a className={page==='graph'?'active':''} onClick={()=>setPage('graph')}>Graph</a>
         <div className="section">Analysis</div>
+        <a className={page==='sar'?'active':''} onClick={()=>setPage('sar')}>SAR Analysis</a>
         <a className={page==='reasoning'?'active':''} onClick={()=>setPage('reasoning')}>Reasoning</a>
         <a className={page==='decisions'?'active':''} onClick={()=>setPage('decisions')}>Decisions</a>
         <div className="section">Execution</div>
         <a className={page==='workflows'?'active':''} onClick={()=>setPage('workflows')}>Workflows</a>
         <a className={page==='autonomous'?'active':''} onClick={()=>setPage('autonomous')}>Autonomous</a>
+        <div className="section">Output</div>
+        <a className={page==='report'?'active':''} onClick={()=>setPage('report')}>Report</a>
     </div>
 );
 
@@ -134,6 +137,25 @@ const Dashboard = ({ onNavigate }) => {
                     </div>
                 ))}
             </div>}
+            <div className="card"><h2>Quick Actions</h2>
+                <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+                    {[{label:'SAR Analysis',icon:'📊',page:'sar',color:'#2563eb'},
+                      {label:'Ask AI',icon:'🧠',page:'chat',color:'#7c3aed'},
+                      {label:'Run Investigation',icon:'🔬',page:'autonomous',color:'#059669'},
+                      {label:'View Graph',icon:'🕸',page:'graph',color:'#d97706'},
+                      {label:'Generate Report',icon:'📄',page:'report',color:'#dc2626'},
+                      {label:'Ingest Data',icon:'📁',page:'ingest',color:'#0891b2'},
+                    ].map(a => (
+                        <div key={a.page} onClick={()=>onNavigate(a.page)} style={{
+                            flex:'1 1 140px',padding:'14px 16px',background:a.color+'22',border:`1px solid ${a.color}55`,
+                            borderRadius:8,cursor:'pointer',textAlign:'center',transition:'transform 0.1s',
+                        }} onMouseOver={e=>e.currentTarget.style.transform='scale(1.03)'} onMouseOut={e=>e.currentTarget.style.transform='scale(1)'}>
+                            <div style={{fontSize:24}}>{a.icon}</div>
+                            <div style={{fontSize:13,fontWeight:600,color:a.color,marginTop:4}}>{a.label}</div>
+                        </div>
+                    ))}
+                </div>
+            </div>
             <div className="card"><h2>Recent Activity</h2>
                 <table><thead><tr><th>Time</th><th>Type</th><th>Description</th></tr></thead>
                 <tbody>{data.recent_activity.map((a,i) => (
@@ -765,6 +787,172 @@ const Provenance = () => {
     </div>);
 };
 
+// ── SAR Analysis Page ─────────────────────────────────
+const SAR = () => {
+    const [profiles, setProfiles] = useState([]);
+    const [heatmap, setHeatmap] = useState([]);
+    const [compareA, setCompareA] = useState('');
+    const [compareB, setCompareB] = useState('');
+    const [comparison, setComparison] = useState(null);
+    useEffect(() => {
+        api.get('/sar/scaffolds').then(setProfiles);
+        api.get('/sar/heatmap').then(setHeatmap);
+    }, []);
+    const runCompare = () => {
+        if (compareA && compareB) api.get(`/sar/compare/${compareA}/${compareB}`).then(setComparison);
+    };
+    // Color scale for pIC50
+    const actColor = (val) => {
+        if (!val) return '#1e293b';
+        const t = Math.max(0, Math.min(1, (val - 5) / 4)); // 5-9 range
+        const r = Math.round(239 * (1-t) + 52 * t);
+        const g = Math.round(68 * (1-t) + 211 * t);
+        const b = Math.round(68 * (1-t) + 153 * t);
+        return `rgb(${r},${g},${b})`;
+    };
+    return (<div>
+        <div className="page-title">SAR Analysis</div>
+
+        {/* Scaffold Profile Cards */}
+        <div className="card"><h2>Scaffold Profiles</h2>
+            <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+                {profiles.map(p => (
+                    <div key={p.scaffold} style={{flex:'1 1 250px',background:'#0f172a',borderRadius:8,padding:14,
+                        border:'1px solid #334155',borderLeft:`4px solid ${SCAFFOLD_COLORS[p.scaffold]||'#38bdf8'}`}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                            <span style={{fontSize:20,fontWeight:700,color:SCAFFOLD_COLORS[p.scaffold]||'#38bdf8'}}>{p.scaffold}</span>
+                            <span style={{fontSize:12,color:'#64748b'}}>{p.compound_count} compounds</span>
+                        </div>
+                        {p.avg_pIC50 && <div style={{marginTop:8}}>
+                            <div style={{display:'flex',justifyContent:'space-between',fontSize:13}}>
+                                <span>Avg pIC50</span><strong style={{color:'#f1f5f9'}}>{p.avg_pIC50}</strong>
+                            </div>
+                            <div className="conf-bar" style={{marginTop:4}}><div className="conf-bar-fill" style={{width:`${(p.avg_pIC50/10)*100}%`,background:SCAFFOLD_COLORS[p.scaffold]||'#38bdf8'}}/></div>
+                            <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#64748b',marginTop:4}}>
+                                <span>Best: {p.best_pIC50}</span><span>Worst: {p.worst_pIC50}</span><span>Spread: {p.spread}</span>
+                            </div>
+                        </div>}
+                        {!p.avg_pIC50 && <div style={{color:'#64748b',fontSize:12,marginTop:8}}>No activity data</div>}
+                    </div>
+                ))}
+            </div>
+        </div>
+
+        {/* Activity Heatmap */}
+        {heatmap.length > 0 && <div className="card"><h2>Activity Heatmap</h2>
+            <div style={{overflowX:'auto'}}>
+                <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
+                    {heatmap.map((d,i) => (
+                        <div key={i} style={{width:28,height:28,borderRadius:4,background:actColor(d.pIC50),
+                            display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,color:'white',
+                            cursor:'default'}} title={`${d.compound}: pIC50=${d.pIC50}`}>
+                            {d.pIC50.toFixed(1)}
+                        </div>
+                    ))}
+                </div>
+                <div style={{display:'flex',gap:16,marginTop:8,fontSize:11,color:'#64748b'}}>
+                    <span><span style={{display:'inline-block',width:12,height:12,background:actColor(5),borderRadius:2,verticalAlign:'middle'}}/> Low (5)</span>
+                    <span><span style={{display:'inline-block',width:12,height:12,background:actColor(7),borderRadius:2,verticalAlign:'middle'}}/> Medium (7)</span>
+                    <span><span style={{display:'inline-block',width:12,height:12,background:actColor(9),borderRadius:2,verticalAlign:'middle'}}/> High (9)</span>
+                </div>
+            </div>
+        </div>}
+
+        {/* Head-to-Head Comparison */}
+        <div className="card"><h2>Scaffold Comparison</h2>
+            <div style={{display:'flex',gap:8,marginBottom:12}}>
+                <select value={compareA} onChange={e=>setCompareA(e.target.value)} style={{flex:1,padding:8,background:'#0f172a',color:'#e2e8f0',border:'1px solid #334155',borderRadius:6}}>
+                    <option value="">Select scaffold A</option>
+                    {profiles.map(p => <option key={p.scaffold} value={p.scaffold}>{p.scaffold} (avg {p.avg_pIC50})</option>)}
+                </select>
+                <span style={{color:'#64748b',alignSelf:'center'}}>vs</span>
+                <select value={compareB} onChange={e=>setCompareB(e.target.value)} style={{flex:1,padding:8,background:'#0f172a',color:'#e2e8f0',border:'1px solid #334155',borderRadius:6}}>
+                    <option value="">Select scaffold B</option>
+                    {profiles.map(p => <option key={p.scaffold} value={p.scaffold}>{p.scaffold} (avg {p.avg_pIC50})</option>)}
+                </select>
+                <button onClick={runCompare} style={{padding:'8px 16px',background:'#2563eb',color:'white',border:'none',borderRadius:6,cursor:'pointer'}}>Compare</button>
+            </div>
+            {comparison && <div style={{display:'flex',gap:12}}>
+                {['a','b'].map(key => {
+                    const s = comparison[key];
+                    const isWinner = comparison.winner === s.scaffold;
+                    return (<div key={key} style={{flex:1,padding:14,background:'#0f172a',borderRadius:8,
+                        border:`2px solid ${isWinner?'#34d399':'#334155'}`}}>
+                        <div style={{display:'flex',justifyContent:'space-between'}}>
+                            <span style={{fontSize:18,fontWeight:700,color:SCAFFOLD_COLORS[s.scaffold]||'#38bdf8'}}>{s.scaffold}</span>
+                            {isWinner && <span className="badge badge-ok">WINNER</span>}
+                        </div>
+                        <div style={{marginTop:8,fontSize:13}}>
+                            <div>Compounds: <strong>{s.compounds}</strong></div>
+                            <div>Active: <strong>{s.active_compounds}</strong></div>
+                            <div>Avg pIC50: <strong>{s.avg_pIC50}</strong></div>
+                            <div>Best: <strong>{s.max_pIC50}</strong></div>
+                            <div>Worst: <strong>{s.min_pIC50}</strong></div>
+                        </div>
+                    </div>);
+                })}
+            </div>}
+            {comparison && <div style={{textAlign:'center',marginTop:10,fontSize:13,color:'#94a3b8'}}>
+                Margin: <strong>{comparison.margin} pIC50 units</strong>
+            </div>}
+        </div>
+
+        {/* Compound Detail Table */}
+        <div className="card"><h2>All Compounds with Activity</h2>
+            <table><thead><tr><th>Scaffold</th><th>Compound</th><th>pIC50</th><th>Activity Bar</th></tr></thead>
+            <tbody>{heatmap.sort((a,b)=>b.pIC50-a.pIC50).map((d,i) => (
+                <tr key={i}><td><span style={{color:SCAFFOLD_COLORS[d.scaffold]||'#38bdf8'}}>{d.scaffold}</span></td>
+                <td>{d.compound}</td><td><strong>{d.pIC50.toFixed(2)}</strong></td>
+                <td><div style={{width:200,height:8,background:'#1e293b',borderRadius:4,overflow:'hidden'}}>
+                    <div style={{width:`${(d.pIC50/10)*100}%`,height:'100%',background:actColor(d.pIC50),borderRadius:4}}/></div></td></tr>
+            ))}</tbody></table>
+        </div>
+    </div>);
+};
+
+// ── Report Page ──────────────────────────────────────
+const Report = () => {
+    const [report, setReport] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const generate = async () => {
+        setLoading(true);
+        const r = await api.get('/report/default');
+        setReport(r); setLoading(false);
+    };
+    useEffect(() => { generate(); }, []);
+    if (loading || !report) return <div className="loading">Generating report...</div>;
+    return (<div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+            <div className="page-title" style={{marginBottom:0}}>Investigation Report</div>
+            <button onClick={()=>{const w=window.open('','_blank');w.document.write('<pre>'+JSON.stringify(report,null,2)+'</pre>');w.document.close();}}
+                style={{padding:'8px 16px',background:'#2563eb',color:'white',border:'none',borderRadius:6,cursor:'pointer'}}>Export JSON</button>
+        </div>
+        <div className="card" style={{borderLeft:'4px solid #38bdf8'}}>
+            <h3 style={{fontSize:18,marginBottom:4}}>{report.title || 'Investigation Report'}</h3>
+            <div style={{fontSize:12,color:'#64748b'}}>Generated: {report.generated_at} | Domain: {report.domain||'general'} | Status: {report.status||'active'}</div>
+        </div>
+        {report.sections.map((section,i) => (
+            <div key={i} className="card">
+                <h2>{section.title}</h2>
+                {Array.isArray(section.data) ? (
+                    section.data.length === 0 ? <div className="loading">No data</div> :
+                    <table><thead><tr>{Object.keys(section.data[0]).map(k => <th key={k}>{k}</th>)}</tr></thead>
+                    <tbody>{section.data.map((row,j) => (
+                        <tr key={j}>{Object.values(row).map((v,k) => <td key={k}>{typeof v==='number'?
+                            (v%1===0?v:v.toFixed(2)):typeof v==='string'?v.substring(0,120):String(v)}</td>)}</tr>
+                    ))}</tbody></table>
+                ) : (
+                    <div className="grid">
+                        {Object.entries(section.data).map(([k,v]) => (
+                            <div key={k} className="stat"><div className="value">{v}</div><div className="label">{k.replace(/_/g,' ')}</div></div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        ))}
+    </div>);
+};
+
 // ── Ingest Page ──────────────────────────────────────
 const Ingest = () => {
     const [filePath, setFilePath] = useState('');
@@ -872,7 +1060,7 @@ const App = () => {
         investigations: () => <Investigations />, artifacts: () => <Artifacts />,
         documents: () => <Documents />, episodes: () => <Episodes />,
         provenance: () => <Provenance />,
-        ingest: () => <Ingest />,
+        sar: () => <SAR />, report: () => <Report />, ingest: () => <Ingest />,
         conflicts: () => <Conflicts />, "low-confidence": () => <LowConfidence />,
     };
     const renderPage = pageMap[page] || pageMap.dashboard;
