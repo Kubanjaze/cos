@@ -228,38 +228,144 @@ const Memory = () => {
     );
 };
 
-// ── Graph Page (SVG visualization) ────────────────────
-const GraphViz = ({ nodes, edges, center }) => {
-    const width = 800, height = 500;
-    const nodeMap = {};
-    const angleStep = (2 * Math.PI) / Math.max(1, nodes.length - 1);
-    nodes.forEach((n, i) => {
-        if (n === center) {
-            nodeMap[n] = { x: width/2, y: height/2 };
-        } else {
-            const angle = i * angleStep;
-            const radius = Math.min(width, height) * 0.35;
-            nodeMap[n] = { x: width/2 + radius * Math.cos(angle), y: height/2 + radius * Math.sin(angle) };
-        }
+// ── Interactive Graph (force-directed, draggable, clickable) ──
+const SCAFFOLD_COLORS = { benz:'#4C72B0', naph:'#DD8452', ind:'#55A868', quin:'#C44E52', pyr:'#8172B2', bzim:'#937860' };
+const getNodeColor = (name) => { const p = name.split('_')[0]; return SCAFFOLD_COLORS[p] || '#38bdf8'; };
+
+const GraphViz = ({ nodes, edges, center, onNodeClick }) => {
+    const svgRef = React.useRef(null);
+    const [positions, setPositions] = useState({});
+    const [dragging, setDragging] = useState(null);
+    const [hovered, setHovered] = useState(null);
+    const [offset, setOffset] = useState({x:0,y:0});
+    const width = 900, height = 550;
+
+    // Build adjacency for edge lookup
+    const edgeIndex = {};
+    edges.forEach(e => {
+        edgeIndex[e.source] = (edgeIndex[e.source]||0) + 1;
+        edgeIndex[e.target] = (edgeIndex[e.target]||0) + 1;
     });
-    const COLORS = { benz:'#4C72B0', naph:'#DD8452', ind:'#55A868', quin:'#C44E52', pyr:'#8172B2', bzim:'#937860' };
-    const getColor = (name) => { const prefix = name.split('_')[0]; return COLORS[prefix] || '#38bdf8'; };
+
+    // Initialize positions with force-directed layout
+    useEffect(() => {
+        const pos = {};
+        const N = nodes.length;
+        // Initial radial layout
+        nodes.forEach((n, i) => {
+            if (n === center) {
+                pos[n] = { x: width/2, y: height/2, vx: 0, vy: 0 };
+            } else {
+                const angle = (i / Math.max(1, N-1)) * 2 * Math.PI;
+                const r = Math.min(width, height) * 0.32;
+                pos[n] = { x: width/2 + r*Math.cos(angle), y: height/2 + r*Math.sin(angle), vx: 0, vy: 0 };
+            }
+        });
+
+        // Run simple force simulation (60 iterations)
+        for (let iter = 0; iter < 60; iter++) {
+            // Repulsion between all nodes
+            for (let i = 0; i < N; i++) {
+                for (let j = i+1; j < N; j++) {
+                    const a = pos[nodes[i]], b = pos[nodes[j]];
+                    let dx = b.x - a.x, dy = b.y - a.y;
+                    const dist = Math.max(1, Math.sqrt(dx*dx + dy*dy));
+                    const force = 800 / (dist * dist);
+                    dx = (dx/dist)*force; dy = (dy/dist)*force;
+                    a.vx -= dx; a.vy -= dy;
+                    b.vx += dx; b.vy += dy;
+                }
+            }
+            // Attraction along edges
+            edges.forEach(e => {
+                const a = pos[e.source], b = pos[e.target];
+                if (!a || !b) return;
+                let dx = b.x - a.x, dy = b.y - a.y;
+                const dist = Math.max(1, Math.sqrt(dx*dx + dy*dy));
+                const force = (dist - 100) * 0.02;
+                dx = (dx/dist)*force; dy = (dy/dist)*force;
+                a.vx += dx; a.vy += dy;
+                b.vx -= dx; b.vy -= dy;
+            });
+            // Center gravity
+            nodes.forEach(n => {
+                const p = pos[n];
+                p.vx += (width/2 - p.x) * 0.005;
+                p.vy += (height/2 - p.y) * 0.005;
+            });
+            // Apply velocity with damping
+            nodes.forEach(n => {
+                const p = pos[n];
+                p.vx *= 0.7; p.vy *= 0.7;
+                p.x += p.vx; p.y += p.vy;
+                p.x = Math.max(30, Math.min(width-30, p.x));
+                p.y = Math.max(30, Math.min(height-30, p.y));
+            });
+        }
+        setPositions({...pos});
+    }, [nodes.join(','), edges.length, center]);
+
+    const handleMouseDown = (name, e) => {
+        e.preventDefault();
+        const svg = svgRef.current.getBoundingClientRect();
+        setDragging(name);
+        setOffset({ x: e.clientX - svg.left - positions[name].x, y: e.clientY - svg.top - positions[name].y });
+    };
+    const handleMouseMove = (e) => {
+        if (!dragging || !positions[dragging]) return;
+        const svg = svgRef.current.getBoundingClientRect();
+        const newPos = {...positions};
+        newPos[dragging] = {...newPos[dragging], x: e.clientX - svg.left - offset.x, y: e.clientY - svg.top - offset.y};
+        setPositions(newPos);
+    };
+    const handleMouseUp = () => setDragging(null);
+
+    if (Object.keys(positions).length === 0) return <div className="loading">Computing layout...</div>;
+
     return (
-        <svg width={width} height={height} style={{background:'#0f172a',borderRadius:8}}>
-            {edges.map((e,i) => {
-                const s = nodeMap[e.source], t = nodeMap[e.target];
-                if (!s || !t) return null;
-                return <line key={i} x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke="#334155" strokeWidth={1.5}/>;
-            })}
-            {nodes.map(n => {
-                const pos = nodeMap[n]; if (!pos) return null;
-                const isCenter = n === center;
-                return (<g key={n}>
-                    <circle cx={pos.x} cy={pos.y} r={isCenter?14:8} fill={getColor(n)} opacity={0.9} stroke={isCenter?'#f1f5f9':'none'} strokeWidth={2}/>
-                    <text x={pos.x} y={pos.y-(isCenter?18:12)} textAnchor="middle" fill="#94a3b8" fontSize={isCenter?12:10}>{n.length>15?n.substring(0,12)+'...':n}</text>
-                </g>);
-            })}
-        </svg>
+        <div>
+            <svg ref={svgRef} width={width} height={height}
+                 style={{background:'#0f172a',borderRadius:8,cursor:dragging?'grabbing':'default'}}
+                 onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+                {/* Edges */}
+                {edges.map((e,i) => {
+                    const s = positions[e.source], t = positions[e.target];
+                    if (!s || !t) return null;
+                    const isHighlight = hovered && (e.source===hovered || e.target===hovered);
+                    return (<g key={'e'+i}>
+                        <line x1={s.x} y1={s.y} x2={t.x} y2={t.y}
+                              stroke={isHighlight?'#64748b':'#1e293b'} strokeWidth={isHighlight?2.5:1.2}/>
+                        {isHighlight && <text x={(s.x+t.x)/2} y={(s.y+t.y)/2-6} textAnchor="middle"
+                              fill="#94a3b8" fontSize={9} style={{pointerEvents:'none'}}>{e.relation}</text>}
+                    </g>);
+                })}
+                {/* Nodes */}
+                {nodes.map(n => {
+                    const p = positions[n]; if (!p) return null;
+                    const isCenter = n === center;
+                    const isHov = n === hovered;
+                    const connections = edgeIndex[n] || 0;
+                    const r = isCenter ? 16 : Math.max(7, Math.min(14, 6 + connections));
+                    return (<g key={n} style={{cursor:'pointer'}}
+                              onMouseDown={(e)=>handleMouseDown(n,e)}
+                              onMouseEnter={()=>setHovered(n)}
+                              onMouseLeave={()=>setHovered(null)}
+                              onDoubleClick={()=>onNodeClick && onNodeClick(n)}>
+                        <circle cx={p.x} cy={p.y} r={isHov?r+3:r} fill={getNodeColor(n)}
+                                opacity={hovered && !isHov ? 0.4 : 0.9}
+                                stroke={isCenter?'#f1f5f9':isHov?'#f1f5f9':'none'} strokeWidth={isCenter||isHov?2:0}/>
+                        <text x={p.x} y={p.y-r-4} textAnchor="middle" fill={isHov?'#f1f5f9':'#64748b'}
+                              fontSize={isCenter?12:isHov?11:9} fontWeight={isHov?700:400}
+                              style={{pointerEvents:'none'}}>{n.length>18?n.substring(0,15)+'...':n}</text>
+                    </g>);
+                })}
+            </svg>
+            {hovered && <div style={{padding:8,fontSize:12,color:'#94a3b8'}}>
+                <strong>{hovered}</strong> — {edgeIndex[hovered]||0} connection(s)
+                {hovered !== center && <span> | Double-click to re-center</span>}
+                <span> | Drag to reposition</span>
+            </div>}
+        </div>
     );
 };
 
@@ -296,12 +402,15 @@ const Graph = () => {
                 </div>
                 {graph && <div>
                     <div style={{marginBottom:8}}>Center: <strong>{graph.center}</strong> — {graph.node_count} nodes, {graph.edge_count} edges</div>
-                    <GraphViz nodes={graph.nodes||[]} edges={graph.edges||[]} center={graph.center}/>
+                    <GraphViz nodes={graph.nodes||[]} edges={graph.edges||[]} center={graph.center}
+                              onNodeClick={(name) => { setEntity(name); api.get(`/graph/${name}?depth=${depth}`).then(setGraph); }}/>
                     <div style={{marginTop:12}}>
+                        <h3 style={{marginBottom:8,color:'#94a3b8'}}>Edge List</h3>
                         <table><thead><tr><th>Source</th><th>Relation</th><th>Target</th></tr></thead>
                         <tbody>{(graph.edges||[]).slice(0,20).map((e,i) => (
                             <tr key={i}><td>{e.source}</td><td><span className="badge badge-ok">{e.relation}</span></td><td>{e.target}</td></tr>
                         ))}</tbody></table>
+                        {(graph.edges||[]).length > 20 && <div style={{color:'#64748b',marginTop:4}}>...and {graph.edges.length-20} more edges</div>}
                     </div>
                 </div>}
             </div>
