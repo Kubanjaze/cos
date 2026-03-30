@@ -1,6 +1,6 @@
 # COS — Cognitive Operating System: Implementation Overview
 
-**Version:** 0.5.1 | **Date:** 2026-03-30
+**Version:** 0.5.2 | **Date:** 2026-03-30
 
 ## What is COS?
 A unified system that ingests information, constructs structured memory, reasons across it, and produces decisions + executable workflows — without manual orchestration.
@@ -124,3 +124,18 @@ See `docs/ROADMAP_COS_ARCHITECT_NOTES.md` for architecture decisions and ADRs.
 | 178 | Continuous learning workflows | ✅ Complete |
 | 179 | Workflow marketplace (internal) | ✅ Complete |
 | 180 | Workflow benchmarking suite | ✅ Complete — **TRACK D COMPLETE** |
+| 181 | Decision object schema | ✅ Complete — **Track E begins** |
+| 182 | Action generation engine | ✅ Complete |
+| 183 | Risk assessment module | ✅ Complete |
+| 184 | Invalidation condition generator | ✅ Complete |
+| 185 | Tradeoff analysis engine | ✅ Complete |
+| 186 | Priority ranking of actions | ✅ Complete |
+| 187 | Decision confidence scoring | ✅ Complete |
+| 188 | Missing evidence detector | ✅ Complete |
+| 189 | Decision tracking (outcomes vs predictions) | ✅ Complete |
+| 190 | Feedback loop into reasoning | ✅ Complete |
+| 191 | Multi-option scenario board | ✅ Complete |
+| 192 | Time-sensitive decision module | ✅ Complete |
+| 193 | Resource allocation engine | ✅ Complete |
+| 194 | Decision audit trail | ✅ Complete |
+| 195 | Decision quality benchmark | ✅ Complete — **TRACK E COMPLETE** |

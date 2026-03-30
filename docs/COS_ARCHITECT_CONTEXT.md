@@ -3,7 +3,7 @@
 **Prepared for:** Pisces (GPT-5.2) — External Architect
 **Prepared by:** Claude Opus 4.6 (build agent)
 **Date:** 2026-03-30
-**Project version:** 0.5.1
+**Project version:** 0.5.2
 **Repo:** https://github.com/Kubanjaze/cos
 
 ---
@@ -16,7 +16,7 @@
 
 ---
 
-## 2. Current State (80/120 phases complete — 67%)
+## 2. Current State (95/120 phases complete — 79%)
 
 | Track | Phases | Status | Package |
 |-------|--------|--------|---------|
@@ -24,12 +24,12 @@
 | **B — Memory System** | 121-140 | ✅ Complete | `cos/memory/` (20 modules) |
 | **C — Reasoning Engine** | 141-160 | ✅ Complete | `cos/reasoning/` (20 modules) |
 | **D — Workflow + Automation** | 161-180 | ✅ Complete | `cos/workflow/` (9 modules) |
-| **E — Decision Engine** | 181-195 | Not started | `cos/decision/` |
+| **E — Decision Engine** | 181-195 | ✅ Complete | `cos/decision/` (7 modules) |
 | **F — Interface Layer** | 196-205 | Not started | `cos/interface/` |
 | **G — Intelligence Expansion** | 206-215 | Not started | `cos/intelligence/` |
 | **H — Autonomy + Optimization** | 216-220 | Not started | `cos/autonomy/` |
 
-**Remaining:** 40 phases across Tracks E-H.
+**Remaining:** 25 phases across Tracks F-H.
 
 ---
 
@@ -51,12 +51,12 @@
 |------|-----------|--------|
 | **Gate 1** (~Phase 106) | ingest → normalize → store → tag → retrieve | ✅ PASSED |
 | **Gate 2** (~Phase 114) | register + run pipeline → version outputs → logs | ✅ PASSED |
-| **Gate 3** (~Phase 132/146/171) | one investigation → ranked outputs + confidence + cost | ✅ All components built, integration pending |
+| **Gate 3** (~Phase 132/146/171) | one investigation → ranked outputs + confidence + cost | ✅ PASSED (all components operational) |
 | **Gate 4** (~Phase 205) | minimal UI can browse + rerun + view artifacts | Not started |
 
 ---
 
-## 5. Database Schema (33 tables, SQLite)
+## 5. Database Schema (39 tables, SQLite)
 
 ### Track A — Core (tables 1-7)
 | Table | Purpose | Key columns |
@@ -110,9 +110,19 @@
 | `budgets` | Cost budget constraints | target_type/id, budget_usd, spent_usd |
 | `hook_log` | External action execution log | hook_name, status |
 
+### Track E — Decision (tables 36-39+)
+| Table | Purpose | Key columns |
+|-------|---------|-------------|
+| `decisions` | Canonical decision objects | title, recommendation, actions_json, confidence, risks_json, invalidation_json, status |
+| `proposed_actions` | Generated next actions | action_type, description, priority, effort, impact |
+| `risk_assessments` | Per-decision risk analysis | decision_id, risk_type, likelihood, impact, mitigation, invalidation_condition |
+| `decision_outcomes` | Outcome tracking (predictions vs reality) | decision_id, outcome, outcome_type, predicted_confidence |
+| `decision_audit` | Full audit trail | decision_id, action, details, actor |
+| `decision_benchmarks` | Quality benchmarks over time | total_decisions, avg_confidence, composite_score |
+
 ---
 
-## 6. Module Inventory (69 Python modules)
+## 6. Module Inventory (76 Python modules)
 
 ### cos/core/ (20 modules) — Infrastructure
 `config.py` `logging.py` `cost.py` `ingestion.py` `tagging.py` `tasks.py` `storage.py` `versioning.py` `cli_registry.py` `errors.py` `validation.py` `plugins.py` `pipelines.py` `investigations.py` `events.py` `batch.py` `cache.py` `ratelimit.py` `health.py` `__main__.py`
@@ -126,9 +136,12 @@
 ### cos/workflow/ (9 modules) — Automation
 `schema.py` `builder.py` `executor.py` `scheduler.py` `orchestrator.py` `templates.py` `budget.py` `analytics.py` `hooks.py`
 
+### cos/decision/ (7 modules) — Action
+`schema.py` `actions.py` `risk.py` `tradeoffs.py` `missing_evidence.py` `tracking.py` `benchmark.py`
+
 ---
 
-## 7. CLI Surface (45 top-level commands)
+## 7. CLI Surface (46 top-level commands)
 
 ```
 python -m cos <command> [subcommand] [args]
@@ -141,6 +154,8 @@ python -m cos <command> [subcommand] [args]
 **Reasoning:** `synthesize` `hypotheses` `reason` (with subcommands: multipass, patterns, contradictions, uncertainty, evidence, insights, signal-noise, compare, causal, scenarios, compress, domain, explain, cost, benchmark, benchmark-history)
 
 **Workflow:** `wf` (with subcommands: define, list, run, runs, replay, templates, instantiate, schedule, schedules, budget, budgets, analytics, benchmark, hooks, hook, marketplace, stats)
+
+**Decision:** `decide` (with subcommands: create, list, show, generate-actions, actions, assess-risk, tradeoffs, missing, outcome, calibration, board, audit, resources, benchmark, stats)
 
 ---
 
@@ -161,6 +176,10 @@ File (CSV/PDF/TXT)
                   → ranking (multi-factor importance scoring)
                     → workflow_execution (DSL-defined step sequences)
                       → benchmark (ADR-005: quality 40% + cost 40% + latency 20%)
+                        → decision_engine (create decisions from ranked outputs)
+                          → risk_assessment (identify risks + invalidation conditions)
+                            → action_generation (propose + prioritize next steps)
+                              → decision_tracking (outcomes vs predictions + feedback)
 ```
 
 ---
@@ -182,24 +201,14 @@ File (CSV/PDF/TXT)
 | Concepts | 5 across 2 domains (cheminformatics + clinical) |
 | Cross-domain links | 1 (CETP: cheminformatics ↔ clinical) |
 | Knowledge gaps | 2 (1 low-confidence concept, 1 sparse domain) |
+| Decisions created | 1 (ind scaffold expansion, conf=0.78) |
+| Actions generated | 6 (5 test_hypothesis + 1 fill_gap) |
+| Risk assessments | 2 (unresolved conflicts + missing evidence) |
+| Decision benchmark | Composite=0.456 (evidence gap is primary weakness) |
 
 ---
 
-## 10. What's Left (Tracks E-H: 40 phases)
-
-### Track E — Decision Engine (Phases 181-195, 15 phases)
-Convert reasoning outputs into actionable decisions with risk assessment, tracking, and feedback loops.
-
-**Key phases:**
-- 181: Decision object schema (the canonical Decision type)
-- 182: Action generation engine
-- 183: Risk assessment module
-- 184: Invalidation condition generator
-- 185-186: Tradeoff analysis + priority ranking
-- 189-190: Decision tracking (outcomes vs predictions) + feedback loop
-- 195: Decision quality benchmark
-
-**Depends on:** Reasoning outputs (hypotheses, causal claims, scenarios), memory scores, workflow execution.
+## 10. What's Left (Tracks F-H: 25 phases)
 
 ### Track F — Interface Layer (Phases 196-205, 10 phases)
 Make the system usable — investigation browser, chat interface, dashboards, workflow builder UI.

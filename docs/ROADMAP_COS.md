@@ -148,21 +148,21 @@
 
 | # | Phase | Tier | Opens |
 |---|---|---|---|
-| 181 | Decision object schema | Micro | What is a decision formally? |
-| 182 | Action generation engine | Standard | What can be done next? |
-| 183 | Risk assessment module | Standard | What can go wrong? |
-| 184 | Invalidation condition generator | Standard | What breaks this? |
-| 185 | Tradeoff analysis engine | Standard | What are the tradeoffs? |
-| 186 | Priority ranking of actions | Standard | What comes first? |
-| 187 | Decision confidence scoring | Micro | How strong is it? |
-| 188 | Missing evidence detector | Standard | What's missing? |
-| 189 | Decision tracking (outcomes vs predictions) | Standard | Were we right? |
-| 190 | Feedback loop into reasoning | Standard | Can system improve? |
-| 191 | Multi-option scenario board | Standard | Can we compare decisions? |
-| 192 | Time-sensitive decision module | Micro | How does urgency matter? |
-| 193 | Resource allocation engine | Standard | Where should effort go? |
-| 194 | Decision audit trail | Micro | Can we explain decisions? |
-| 195 | Decision quality benchmark | Standard | Are decisions improving? |
+| 181 | ✅ | Decision object schema | Micro | What is a decision formally? |
+| 182 | ✅ | Action generation engine | Standard | What can be done next? |
+| 183 | ✅ | Risk assessment module | Standard | What can go wrong? |
+| 184 | ✅ | Invalidation condition generator | Standard | What breaks this? |
+| 185 | ✅ | Tradeoff analysis engine | Standard | What are the tradeoffs? |
+| 186 | ✅ | Priority ranking of actions | Standard | What comes first? |
+| 187 | ✅ | Decision confidence scoring | Micro | How strong is it? |
+| 188 | ✅ | Missing evidence detector | Standard | What's missing? |
+| 189 | ✅ | Decision tracking (outcomes vs predictions) | Standard | Were we right? |
+| 190 | ✅ | Feedback loop into reasoning | Standard | Can system improve? |
+| 191 | ✅ | Multi-option scenario board | Standard | Can we compare decisions? |
+| 192 | ✅ | Time-sensitive decision module | Micro | How does urgency matter? |
+| 193 | ✅ | Resource allocation engine | Standard | Where should effort go? |
+| 194 | ✅ | Decision audit trail | Micro | Can we explain decisions? |
+| 195 | ✅ | Decision quality benchmark | Standard | Are decisions improving? |
 
 ---
 
