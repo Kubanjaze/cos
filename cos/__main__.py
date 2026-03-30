@@ -460,6 +460,37 @@ def main():
     ui_sub.add_parser("settings", help="List user settings")
     ui_sub.add_parser("stats", help="Interface statistics")
 
+    # ── Track G: Intelligence Expansion ──────────────────────
+    intel_parser = sub.add_parser("intel", help="Intelligence operations")
+    intel_sub = intel_parser.add_subparsers(dest="intel_command")
+    intel_consult_p = intel_sub.add_parser("consult", help="Multi-agent consultation")
+    intel_consult_p.add_argument("query")
+    intel_debate_p = intel_sub.add_parser("debate", help="Agent debate")
+    intel_debate_p.add_argument("query")
+    intel_debate_p.add_argument("--rounds", type=int, default=2)
+    intel_sub.add_parser("agents", help="List agents")
+    intel_sim_p = intel_sub.add_parser("simulate", help="Run simulation")
+    intel_sim_p.add_argument("name")
+    intel_sim_p.add_argument("--scaffold", default="benz")
+    intel_sub.add_parser("novelty", help="Detect novel findings")
+    intel_sub.add_parser("autonomous-cycle", help="Run autonomous hypothesis cycle")
+    intel_sub.add_parser("meta", help="Meta-reasoning assessment")
+    intel_sub.add_parser("benchmark", help="Intelligence benchmark")
+    intel_sub.add_parser("stats", help="Intelligence statistics")
+
+    # ── Track H: Autonomy + Optimization ──────────────────
+    auto_parser = sub.add_parser("auto", help="Autonomy operations")
+    auto_sub = auto_parser.add_subparsers(dest="auto_command")
+    auto_run_p = auto_sub.add_parser("run", help="Autonomous workflow execution")
+    auto_run_p.add_argument("--investigation", default="default")
+    auto_sub.add_parser("optimize", help="Cost optimization suggestions")
+    auto_sub.add_parser("priorities", help="Priority-driven scheduling")
+    auto_sub.add_parser("monitor", help="System health monitoring")
+    auto_inv_p = auto_sub.add_parser("investigate", help="Full autonomous investigation")
+    auto_inv_p.add_argument("question")
+    auto_inv_p.add_argument("--investigation", default="default")
+    auto_sub.add_parser("stats", help="Autonomy statistics")
+
     sub.add_parser("health", help="System health dashboard")
 
     docs_parser = sub.add_parser("docs", help="Document store")
@@ -1844,6 +1875,118 @@ def main():
             print(f"Interface: {s['dashboard_sections']} dashboard sections, {s['db_tables']} DB tables")
         else:
             ui_parser.print_help()
+
+    # ── Track G: Intelligence Handlers ──────────────────────
+    elif args.command == "intel":
+        if args.intel_command == "consult":
+            from cos.intelligence.agents import multi_agent_system
+            result = multi_agent_system.consult(args.query)
+            print(f"Multi-agent consultation: '{args.query}'\n")
+            for a in result["agents"]:
+                print(f"  [{a['agent']:>10}] conf={a['confidence']:.2f} — {a['analysis'][:55]}")
+            print(f"\n  Consensus: {result['consensus']} (avg conf={result['avg_confidence']:.3f})")
+        elif args.intel_command == "debate":
+            from cos.intelligence.agents import multi_agent_system
+            result = multi_agent_system.debate(args.query, rounds=args.rounds)
+            print(f"Agent debate: {result['rounds']} rounds, final confidence={result['final_confidence']:.3f}")
+            for i, rnd in enumerate(result["debate_log"], 1):
+                agents = " | ".join(f"{a['agent']}={a['confidence']:.2f}" for a in rnd)
+                print(f"  Round {i}: {agents}")
+        elif args.intel_command == "agents":
+            from cos.intelligence.agents import multi_agent_system
+            for a in multi_agent_system.list_agents():
+                print(f"  {a['name']:>10}: {a['perspective']}")
+        elif args.intel_command == "simulate":
+            from cos.intelligence.simulation import simulation_engine
+            result = simulation_engine.run(args.name, base_scaffold=args.scaffold)
+            print(f"Simulation: {result['name']} (scaffold={result['scaffold']}, base={result['base_compounds']} compounds, avg={result['base_avg']})")
+            for s in result["scenarios"]:
+                print(f"  threshold={s['confidence_threshold']:.1f}: {s['compounds_remaining']} compounds, avg={s['avg_activity']}, enrichment={s['enrichment']:.3f}")
+        elif args.intel_command == "novelty":
+            from cos.intelligence.simulation import novelty_detector
+            items = novelty_detector.detect()
+            print(f"Novel findings ({len(items)}):")
+            for n in items[:10]:
+                print(f"  [{n['type']:>18}] novelty={n['novelty']:.2f} — {n['description'][:55]}")
+        elif args.intel_command == "autonomous-cycle":
+            from cos.intelligence.meta import autonomous_loop
+            result = autonomous_loop.run_cycle()
+            print(f"Autonomous cycle ({result['duration_s']:.3f}s):")
+            for s in result["steps"]:
+                print(f"  {s['action']:>10}: {s}")
+        elif args.intel_command == "meta":
+            from cos.intelligence.meta import meta_reasoner
+            result = meta_reasoner.assess_reasoning_quality()
+            print(f"Meta-Reasoning Assessment (score={result.get('meta_score', 0):.3f}):")
+            for k, v in result.items():
+                if k != "recommendations":
+                    print(f"  {k}: {v}")
+            if result.get("recommendations"):
+                print(f"\n  Recommendations:")
+                for r in result["recommendations"]:
+                    print(f"    → {r}")
+        elif args.intel_command == "benchmark":
+            from cos.intelligence.meta import intelligence_benchmark
+            result = intelligence_benchmark.run()
+            print(f"Intelligence Benchmark (composite={result['composite']:.4f}):")
+            print(f"  Reasoning:  {result['reasoning']:.4f}")
+            print(f"  Decision:   {result['decision']:.4f}")
+            print(f"  Memory:     {result['memory']:.4f}")
+            print(f"  Meta:       {result['meta']:.4f}")
+        elif args.intel_command == "stats":
+            from cos.intelligence.agents import multi_agent_system
+            s = multi_agent_system.stats()
+            print(f"Intelligence: {s['registered_agents']} agents, {s['total_runs']} runs")
+        else:
+            intel_parser.print_help()
+
+    # ── Track H: Autonomy Handlers ──────────────────────
+    elif args.command == "auto":
+        if args.auto_command == "run":
+            from cos.autonomy.autonomous import autonomous_executor
+            result = autonomous_executor.run_autonomous(investigation_id=args.investigation)
+            print(f"Autonomous execution: {result['status']}")
+            if result.get("workflow"):
+                print(f"  Workflow: {result['workflow']} ({result['duration_s']:.3f}s, {result['steps_completed']} steps)")
+        elif args.auto_command == "optimize":
+            from cos.autonomy.autonomous import cost_optimizer_ai
+            result = cost_optimizer_ai.optimize()
+            print(f"Cost Optimization:")
+            print(f"  Total cost: ${result['total_cost']:.4f}")
+            print(f"  Cache entries: {result['cache_entries']}")
+            for s in result["suggestions"]:
+                print(f"  → {s}")
+        elif args.auto_command == "priorities":
+            from cos.autonomy.autonomous import priority_scheduler
+            tasks = priority_scheduler.schedule_by_priority()
+            if not tasks:
+                print("No pending tasks.")
+            else:
+                print("Priority Queue:")
+                for t in tasks:
+                    print(f"  [{t['priority']:.1f}] {t['task']:>20} — {t['description']}")
+        elif args.auto_command == "monitor":
+            from cos.autonomy.autonomous import continuous_monitor
+            result = continuous_monitor.check()
+            print(f"System Monitor: {result['overall']}")
+            for c in result["checks"]:
+                icon = "OK" if c["status"] == "ok" else "!!"
+                print(f"  [{icon}] {c['check']:>20}: {c['status']}")
+        elif args.auto_command == "investigate":
+            from cos.autonomy.autonomous import autonomous_investigation
+            result = autonomous_investigation.run(args.question, investigation_id=args.investigation)
+            print(f"\nAutonomous Investigation: '{args.question}'")
+            print(f"Status: {result['status']} ({result['duration_s']:.3f}s, {result['success_rate']:.0%} success)\n")
+            for s in result["steps"]:
+                icon = "OK" if s.get("status") == "ok" else "!!"
+                print(f"  [{icon}] {s['phase']:>10} → {s.get('action', '?')}")
+        elif args.auto_command == "stats":
+            from cos.autonomy.autonomous import autonomous_investigation
+            s = autonomous_investigation.stats()
+            print(f"Autonomy: {s['capability']}")
+            print(f"  Steps: {' → '.join(s['steps'])}")
+        else:
+            auto_parser.print_help()
 
     elif args.command == "health":
         from cos.core.health import get_health_report, format_health_report
