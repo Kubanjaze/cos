@@ -180,3 +180,9 @@ This log tracks updates to the COS project-level `implementation.md`. Each entry
 - 13th DB table: `temporal_tags`
 - Timeline view with COALESCE ordering
 - Project version: 0.2.6 → 0.2.7
+
+### 2026-03-30 11:19 — Episodic memory added (Phase 126)
+- `cos/memory/episodic.py` — action records ("what happened")
+- 14th DB table: `episodes`
+- record/recall/get_recent/stats
+- Project version: 0.2.7 → 0.2.8

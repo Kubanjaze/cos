@@ -66,7 +66,7 @@
 | 123 | ✅ | Structured entity extraction | Standard | Can we move beyond text? |
 | 124 | ✅ | Relationship extractor (entity links) | Standard | Can we form graphs? |
 | 125 | ✅ | Temporal tagging (time-aware memory) | Micro | Can we track evolution? |
-| 126 | Episodic memory layer (runs + outputs) | Standard | Can we recall past work? |
+| 126 | ✅ | Episodic memory layer (runs + outputs) | Standard | Can we recall past work? |
 | 127 | Semantic memory layer (concept definitions) | Standard | Can we store knowledge cleanly? |
 | 128 | Procedural memory layer (saved workflows) | Standard | Can we reuse processes? |
 | 129 | Knowledge graph database integration | Standard | Can we query relationships? |
