@@ -1,6 +1,6 @@
 # COS — Cognitive Operating System: Implementation Overview
 
-**Version:** 0.4.1 | **Date:** 2026-03-30
+**Version:** 0.5.0 | **Date:** 2026-03-30
 
 ## What is COS?
 A unified system that ingests information, constructs structured memory, reasons across it, and produces decisions + executable workflows — without manual orchestration.
@@ -84,3 +84,23 @@ See `docs/ROADMAP_COS_ARCHITECT_NOTES.md` for architecture decisions and ADRs.
 | 138 | External knowledge connectors | ✅ Complete |
 | 139 | Knowledge gap detection | ✅ Complete |
 | 140 | Memory visualization (graph + clusters) | ✅ Complete — **TRACK B COMPLETE** |
+| 141 | Multi-source synthesis engine | ✅ Complete — **Track C begins** |
+| 142 | Ranking engine (importance scoring) | ✅ Complete |
+| 143 | Contradiction analyzer | ✅ Complete |
+| 144 | Hypothesis generator | ✅ Complete |
+| 145 | Disconfirmation engine | ✅ Complete |
+| 146 | Uncertainty estimator | ✅ Complete |
+| 147 | Evidence weighting system | ✅ Complete |
+| 148 | Pattern detection (trends + clusters) | ✅ Complete |
+| 149 | Causal inference scaffolding | ✅ Complete |
+| 150 | Scenario generator | ✅ Complete |
+| 151 | Comparison engine (A vs B) | ✅ Complete |
+| 152 | Summary compression engine | ✅ Complete |
+| 153 | Insight extraction module | ✅ Complete |
+| 154 | Signal vs noise classifier | ✅ Complete |
+| 155 | Iterative refinement loop | ✅ Complete |
+| 156 | Multi-pass reasoning system | ✅ Complete |
+| 157 | Domain adapters (science, markets) | ✅ Complete |
+| 158 | Explainability layer | ✅ Complete |
+| 159 | Reasoning cost optimizer | ✅ Complete |
+| 160 | Reasoning benchmark suite | ✅ Complete — **TRACK C COMPLETE** |

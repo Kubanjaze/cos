@@ -90,26 +90,26 @@
 
 | # | Phase | Tier | Opens |
 |---|---|---|---|
-| 141 | Multi-source synthesis engine | Standard | Can we combine inputs? |
-| 142 | Ranking engine (importance scoring) | Standard | What matters most? |
-| 143 | Contradiction analyzer | Standard | What conflicts exist? |
-| 144 | Hypothesis generator | Standard | What explanations emerge? |
-| 145 | Disconfirmation engine | Standard | What breaks them? |
-| 146 | Uncertainty estimator | Standard | How confident are we? |
-| 147 | Evidence weighting system | Standard | Which sources matter? |
-| 148 | Pattern detection (trends + clusters) | Standard | What repeats? |
-| 149 | Causal inference scaffolding | Standard | What drives what? |
-| 150 | Scenario generator | Standard | What could happen next? |
-| 151 | Comparison engine (A vs B) | Micro | Which is stronger? |
-| 152 | Summary compression engine | Standard | Can we reduce complexity? |
-| 153 | Insight extraction module | Standard | What's actually new? |
-| 154 | Signal vs noise classifier | Standard | What should be ignored? |
-| 155 | Iterative refinement loop | Standard | Can outputs improve? |
-| 156 | Multi-pass reasoning system | Standard | Can deeper reasoning emerge? |
-| 157 | Domain adapters (science, markets) | Standard | Can reasoning specialize? |
-| 158 | Explainability layer | Micro | Can we trust outputs? |
-| 159 | Reasoning cost optimizer | Micro | Can we reduce cost? |
-| 160 | Reasoning benchmark suite | Standard | Is the system improving? |
+| 141 | ✅ | Multi-source synthesis engine | Standard | Can we combine inputs? |
+| 142 | ✅ | Ranking engine (importance scoring) | Standard | What matters most? |
+| 143 | ✅ | Contradiction analyzer | Standard | What conflicts exist? |
+| 144 | ✅ | Hypothesis generator | Standard | What explanations emerge? |
+| 145 | ✅ | Disconfirmation engine | Standard | What breaks them? |
+| 146 | ✅ | Uncertainty estimator | Standard | How confident are we? |
+| 147 | ✅ | Evidence weighting system | Standard | Which sources matter? |
+| 148 | ✅ | Pattern detection (trends + clusters) | Standard | What repeats? |
+| 149 | ✅ | Causal inference scaffolding | Standard | What drives what? |
+| 150 | ✅ | Scenario generator | Standard | What could happen next? |
+| 151 | ✅ | Comparison engine (A vs B) | Micro | Which is stronger? |
+| 152 | ✅ | Summary compression engine | Standard | Can we reduce complexity? |
+| 153 | ✅ | Insight extraction module | Standard | What's actually new? |
+| 154 | ✅ | Signal vs noise classifier | Standard | What should be ignored? |
+| 155 | ✅ | Iterative refinement loop | Standard | Can outputs improve? |
+| 156 | ✅ | Multi-pass reasoning system | Standard | Can deeper reasoning emerge? |
+| 157 | ✅ | Domain adapters (science, markets) | Standard | Can reasoning specialize? |
+| 158 | ✅ | Explainability layer | Micro | Can we trust outputs? |
+| 159 | ✅ | Reasoning cost optimizer | Micro | Can we reduce cost? |
+| 160 | ✅ | Reasoning benchmark suite | Standard | Is the system improving? |
 
 ---
 
