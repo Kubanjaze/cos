@@ -1,38 +1,46 @@
 # Phase 126 — Episodic Memory Layer (Runs + Outputs)
 
-**Version:** 1.0 | **Tier:** Standard | **Date:** 2026-03-30
+**Version:** 1.1 | **Tier:** Standard | **Date:** 2026-03-30
 
 ## Goal
-Build an episodic memory layer that records what COS has done — every pipeline run, query, and analysis becomes a retrievable episode. Episodic memory answers "what happened?" while semantic memory (Phase 127) answers "what do we know?"
+Record what COS has done — every pipeline run, query, and analysis becomes a retrievable episode. Episodic memory answers "what happened?" vs semantic memory's "what do we know?"
 
-CLI: `python -m cos episodes list [--investigation <id>]` / `python -m cos episodes record <description>`
+CLI: `python -m cos episodes list` / `episodes record <desc>` / `episodes stats`
 
 Outputs: Episode records in SQLite `episodes` table
 
 ## Logic
-1. Create `cos/memory/episodic.py` with `EpisodicMemory` class
-2. `episodes` table: id, episode_type, description, input_summary, output_summary, investigation_id, duration_s, cost_usd, created_at
-3. Episode types: `ingestion`, `extraction`, `embedding`, `search`, `pipeline`, `analysis`, `manual`
-4. `record(type, description, input_summary, output_summary, investigation_id, duration, cost)` — log an episode
-5. `recall(investigation_id, episode_type, limit)` — retrieve past episodes
-6. Integration: pipeline runs (Phase 114) auto-record episodes via event bus (Phase 116)
-7. `get_recent(limit)` — most recent episodes across all investigations
+1. `episodes` table: id, episode_type, description, input/output summaries, investigation_id, duration, cost
+2. Episode types: ingestion, extraction, embedding, search, pipeline, analysis, manual
+3. `record()` logs an episode with context; `recall()` retrieves with filters
+4. `get_recent()` returns latest across all investigations
 
 ## Key Concepts
-- **Episodic memory**: "what happened" — records of actions taken, not facts learned
-- **MemoryItem kind = episodic** (from Architect Notes schema)
-- **Auto-recording**: future phases emit events → episodic memory listens and records
-- **Cost tracking integration**: each episode can include its cost (from Phase 104)
-- **Searchable by type + investigation**: filter by what kind of work was done
+- **Episodic = "what happened"**: action records, not knowledge facts
+- **MemoryItem kind=episodic** per Architect Notes schema
+- **Input/output summaries**: human-readable context for each episode
+- **Cost tracking**: each episode optionally records its API cost
+- **Filterable**: by investigation_id and episode_type
 
 ## Verification Checklist
-- [ ] `record()` creates episode with all fields
-- [ ] `recall(investigation_id)` returns episodes for that investigation
-- [ ] `recall(episode_type="ingestion")` filters by type
-- [ ] `get_recent(5)` returns last 5 episodes across all
-- [ ] CLI: episodes list + episodes record work
+- [x] `record("ingestion", ...)` creates episode with all fields
+- [x] `recall("inv-cetp")` returns 3 episodes for that investigation
+- [x] Episodes include input/output summaries
+- [x] `stats()` shows 3 total, by type counts
+- [x] CLI: episodes list, record, stats all work
 
-## Risks
-- Episode volume: every action creates an episode — may need pruning at scale
-- Auto-recording not implemented in v0 — manual record() calls for now
-- Cost field may be 0 for free operations — that's fine, tracks non-API work too
+## Risks (resolved)
+- Episode volume at scale: pruning deferred to Phase 133 (memory pruning)
+- Auto-recording via events not yet wired: manual record() for v0
+- Zero-cost episodes for free ops: tracked for completeness
+
+## Results
+| Metric | Value |
+|--------|-------|
+| Episodes recorded | 3 (ingestion, extraction, embedding) |
+| Episode types | 3 active |
+| DB table | episodes (table 14) |
+| External deps | 0 |
+| Cost | $0.00 |
+
+Key finding: Episodic memory is the COS audit trail — every action recorded with input/output context. Combined with temporal tags (Phase 125), we can reconstruct the full history of an investigation: what was ingested, when, what was extracted, how long it took.

@@ -96,6 +96,17 @@ def main():
     status_p.add_argument("task_id", help="Task ID (full or partial)")
     task_sub.add_parser("run", help="Process pending tasks")
 
+    ep_parser = sub.add_parser("episodes", help="Episodic memory")
+    ep_sub = ep_parser.add_subparsers(dest="ep_command")
+    ep_list_p = ep_sub.add_parser("list", help="List episodes")
+    ep_list_p.add_argument("--investigation", default=None)
+    ep_list_p.add_argument("--type", default=None)
+    ep_record_p = ep_sub.add_parser("record", help="Record an episode")
+    ep_record_p.add_argument("description")
+    ep_record_p.add_argument("--type", default="manual")
+    ep_record_p.add_argument("--investigation", default="default")
+    ep_sub.add_parser("stats", help="Episode statistics")
+
     temp_parser = sub.add_parser("temporal", help="Temporal tagging")
     temp_sub = temp_parser.add_subparsers(dest="temp_command")
     temp_tag_p = temp_sub.add_parser("tag", help="Add temporal tag")
@@ -381,6 +392,27 @@ def main():
             print(f"Processed {n} tasks.")
         else:
             task_parser.print_help()
+
+    elif args.command == "episodes":
+        from cos.memory.episodic import episodic_memory
+        if args.ep_command == "list":
+            eps = episodic_memory.recall(investigation_id=args.investigation, episode_type=args.type)
+            if not eps:
+                print("No episodes found.")
+            else:
+                for e in eps:
+                    cost_str = f" ${e.cost_usd:.4f}" if e.cost_usd > 0 else ""
+                    print(f"  {e.created_at}  [{e.episode_type:>10}] {e.description[:50]}{cost_str}")
+        elif args.ep_command == "record":
+            ep_id = episodic_memory.record(args.type, args.description, investigation_id=args.investigation)
+            print(f"Episode recorded: {ep_id}")
+        elif args.ep_command == "stats":
+            s = episodic_memory.stats()
+            print(f"Episodes: {s['total']} total, ${s['total_cost']:.4f} cost")
+            for t, c in s["by_type"].items():
+                print(f"  {t}: {c}")
+        else:
+            ep_parser.print_help()
 
     elif args.command == "temporal":
         from cos.memory.temporal import temporal_tagger
