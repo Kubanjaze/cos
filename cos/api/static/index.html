@@ -972,13 +972,28 @@ const MolSVG = ({ base64svg, width, height }) => {
 const Compounds = () => {
     const [compounds, setCompounds] = useState([]);
     const [filter, setFilter] = useState('');
+    const [invFilter, setInvFilter] = useState('');
     const [detail, setDetail] = useState(null);
-    useEffect(() => { api.get('/chem/compounds').then(setCompounds); }, []);
+    const load = (inv) => {
+        const url = inv ? `/chem/compounds?investigation=${inv}` : '/chem/compounds';
+        api.get(url).then(setCompounds);
+    };
+    useEffect(() => { load(invFilter); }, [invFilter]);
     const filtered = filter ? compounds.filter(c => c.scaffold === filter) : compounds;
     const scaffolds = [...new Set(compounds.map(c => c.scaffold))];
+    const investigations = [...new Set(compounds.map(c => c.investigation_id).filter(Boolean))];
     return (<div>
         <div className="page-title">Compounds ({filtered.length})</div>
         <div className="card">
+            <h2>Target Program</h2>
+            <div className="suggestion-chips" style={{marginBottom:12}}>
+                <div className={`chip ${!invFilter?'active':''}`} onClick={()=>setInvFilter('')} style={{background:!invFilter?'#2563eb':''}}>All Programs</div>
+                {['inv-cetp','inv-kras','inv-egfr'].map(inv => (
+                    <div key={inv} className="chip" onClick={()=>setInvFilter(inv)} style={{background:invFilter===inv?'#2563eb':''}}>
+                        {inv.replace('inv-','').toUpperCase()}</div>
+                ))}
+            </div>
+            <h2>Scaffold Filter</h2>
             <div className="suggestion-chips" style={{marginBottom:12}}>
                 <div className={`chip ${!filter?'active':''}`} onClick={()=>setFilter('')} style={{background:!filter?'#2563eb':''}}>All ({compounds.length})</div>
                 {scaffolds.map(s => (

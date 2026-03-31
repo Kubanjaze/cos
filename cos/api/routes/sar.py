@@ -8,12 +8,20 @@ router = APIRouter()
 
 
 @router.get("/sar/scaffolds")
-def scaffold_profiles():
-    """Full SAR profile for each scaffold family."""
+def scaffold_profiles(investigation: str = None):
+    """Full SAR profile for each scaffold family, optionally scoped to investigation."""
     conn = sqlite3.connect(settings.db_path)
-    scaffolds = conn.execute(
-        "SELECT DISTINCT target_value FROM entity_relations WHERE relation_type='belongs_to_scaffold' ORDER BY target_value"
-    ).fetchall()
+    if investigation:
+        scaffolds = conn.execute("""
+            SELECT DISTINCT r.target_value FROM entity_relations r
+            JOIN entities e ON r.source_entity=e.name
+            WHERE r.relation_type='belongs_to_scaffold' AND e.investigation_id=?
+            ORDER BY r.target_value
+        """, (investigation,)).fetchall()
+    else:
+        scaffolds = conn.execute(
+            "SELECT DISTINCT target_value FROM entity_relations WHERE relation_type='belongs_to_scaffold' ORDER BY target_value"
+        ).fetchall()
 
     profiles = []
     for (scaffold,) in scaffolds:
