@@ -1137,21 +1137,26 @@ const TargetProfile = () => {
         });
     }, []);
     const switchTarget = (name) => { setSelected(name); api.get(`/targets/${name}`).then(setProfile); };
-    if (!profile) return <div className="loading">Loading target profile...</div>;
+    if (!profile && targets.length === 0) return <div className="loading">Loading target profile...</div>;
+    if (!profile) return <div className="loading">Select a target...</div>;
     return (<div>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
             <div className="page-title" style={{marginBottom:0}}>Target: {profile.target}</div>
             <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                {targets.length > 1 && <select value={selected} onChange={e=>switchTarget(e.target.value)}
-                    style={{padding:'8px 12px',background:'#0f172a',color:'#e2e8f0',border:'1px solid #334155',borderRadius:6,fontSize:13}}>
-                    {targets.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
-                </select>}
-                {targets.length <= 1 && <div style={{fontSize:12,color:'#64748b'}}>Add more targets via Ingest Data or Import Assay</div>}
+                <div className="suggestion-chips">
+                    {targets.map(t => (
+                        <div key={t.name} className="chip" onClick={()=>switchTarget(t.name)}
+                             style={{background:selected===t.name?'#2563eb':'',
+                             opacity:t.has_data===false?0.5:1}}>
+                            {t.name} {t.compounds > 0 ? `(${t.compounds})` : '(no data)'}
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
         <div className="card" style={{borderLeft:'4px solid #38bdf8'}}>
             <h3>{profile.target}</h3>
-            <div style={{fontSize:14,color:'#94a3b8',marginTop:4}}>{profile.definition}</div>
+            <div style={{fontSize:14,color:'#94a3b8',marginTop:4}}>{profile.definition || 'No definition available — add via Chat or Concepts'}</div>
             <div style={{display:'flex',gap:20,marginTop:12}}>
                 <div className="stat"><div className="value">{profile.total_compounds}</div><div className="label">Compounds</div></div>
                 <div className="stat"><div className="value">{profile.total_relations}</div><div className="label">Relations</div></div>
@@ -1159,6 +1164,16 @@ const TargetProfile = () => {
                 {profile.confidence && <div className="stat"><div className="value">{(profile.confidence*100).toFixed(0)}%</div><div className="label">Confidence</div></div>}
             </div>
         </div>
+
+        {profile.total_compounds === 0 && <div className="card" style={{borderLeft:'4px solid #fbbf24'}}>
+            <h2>No compound data for {profile.target}</h2>
+            <p style={{color:'#94a3b8'}}>This target was detected but has no associated compound or activity data yet. You can:</p>
+            <div style={{marginTop:8,display:'flex',gap:8,flexWrap:'wrap'}}>
+                <div className="chip" onClick={()=>{}}>Import assay data for {profile.target}</div>
+                <div className="chip" onClick={()=>{}}>Ingest a document mentioning {profile.target}</div>
+                <div className="chip" onClick={()=>{}}>Define {profile.target} as a concept</div>
+            </div>
+        </div>}
 
         <div className="card"><h2>Scaffold Families</h2>
             <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>

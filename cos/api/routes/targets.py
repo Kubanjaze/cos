@@ -51,21 +51,50 @@ def list_targets():
         if has_activity > 0:
             seen.add("UNKNOWN_TARGET")
 
-    # Build target profiles
-    compound_count = conn.execute("SELECT COUNT(DISTINCT name) FROM entities WHERE entity_type='compound'").fetchone()[0]
-    scaffold_count = conn.execute("SELECT COUNT(DISTINCT target_value) FROM entity_relations WHERE relation_type='belongs_to_scaffold'").fetchone()[0]
-    activity_count = conn.execute("SELECT COUNT(*) FROM entity_relations WHERE relation_type='has_activity'").fetchone()[0]
+    # Build target profiles — scope data per target
+    # Map targets to investigations if possible
+    inv_map = {}
+    for row in conn.execute("SELECT id, title FROM investigations").fetchall():
+        for name in seen:
+            if name.lower() in row[1].lower():
+                inv_map[name] = row[0]
 
     for name in sorted(seen):
+        inv_id = inv_map.get(name)
+
+        # Count compounds scoped to this target's investigation (or all if no investigation)
+        if inv_id:
+            compounds = conn.execute("SELECT COUNT(DISTINCT name) FROM entities WHERE entity_type='compound' AND investigation_id=?", (inv_id,)).fetchone()[0]
+            scaffolds = conn.execute("""
+                SELECT COUNT(DISTINCT r.target_value) FROM entity_relations r
+                JOIN entities e ON r.source_entity=e.name
+                WHERE r.relation_type='belongs_to_scaffold' AND e.investigation_id=?
+            """, (inv_id,)).fetchone()[0]
+            activities = conn.execute("""
+                SELECT COUNT(*) FROM entity_relations r
+                JOIN entities e ON r.source_entity=e.name
+                WHERE r.relation_type='has_activity' AND e.investigation_id=?
+            """, (inv_id,)).fetchone()[0]
+        else:
+            # Check if this target has a concept — if it's the primary target, show all data
+            has_concept = conn.execute("SELECT COUNT(*) FROM concepts WHERE UPPER(name)=?", (name,)).fetchone()[0]
+            if has_concept > 0:
+                compounds = conn.execute("SELECT COUNT(DISTINCT name) FROM entities WHERE entity_type='compound'").fetchone()[0]
+                scaffolds = conn.execute("SELECT COUNT(DISTINCT target_value) FROM entity_relations WHERE relation_type='belongs_to_scaffold'").fetchone()[0]
+                activities = conn.execute("SELECT COUNT(*) FROM entity_relations WHERE relation_type='has_activity'").fetchone()[0]
+            else:
+                compounds, scaffolds, activities = 0, 0, 0
+
         concept = conn.execute(
             "SELECT definition, confidence FROM concepts WHERE UPPER(name)=? ORDER BY confidence DESC LIMIT 1",
             (name,),
         ).fetchone()
         targets.append({
-            "name": name, "compounds": compound_count, "scaffolds": scaffold_count,
-            "activities": activity_count,
+            "name": name, "compounds": compounds, "scaffolds": scaffolds,
+            "activities": activities,
             "definition": concept[0] if concept else None,
             "confidence": concept[1] if concept else None,
+            "has_data": compounds > 0,
         })
 
     conn.close()
