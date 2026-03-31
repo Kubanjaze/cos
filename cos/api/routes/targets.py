@@ -26,13 +26,14 @@ def list_targets():
     for (name,) in rows:
         seen.add(name.upper())
 
-    # Source 2: Investigations — each investigation represents a target program
+    # Source 2: Investigations — use the primary target name (first uppercase word only)
     rows = conn.execute("SELECT id, title, domain FROM investigations").fetchall()
     for inv_id, title, domain in rows:
-        # Extract likely target name from title (first word or known pattern)
-        for word in title.replace("-", " ").split():
+        words = title.replace("-", " ").split()
+        for word in words:
             if len(word) >= 3 and word.upper() == word and word.upper() not in seen:
                 seen.add(word.upper())
+                break  # Only take the first uppercase word as the target name
 
     # Source 3: Concepts that look like biological targets (not methods/metrics/AI)
     rows = conn.execute(
