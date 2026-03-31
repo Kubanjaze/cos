@@ -1125,6 +1125,46 @@ const ActivityCliffs = () => {
     </div>);
 };
 
+// ── ChEMBL Fetcher Component ─────────────────────────
+const ChEMBLFetcher = ({ target, onDone }) => {
+    const [loading, setLoading] = useState(false);
+    const [result, setResult] = useState(null);
+    const [customTarget, setCustomTarget] = useState('');
+    const fetch_data = async (name) => {
+        setLoading(true); setResult(null);
+        const r = await api.post('/targets/fetch-chembl', null);
+        // Use query param approach
+        const resp = await fetch(`/api/targets/fetch-chembl?target_name=${encodeURIComponent(name)}`, {method:'POST'});
+        const data = await resp.json();
+        setResult(data); setLoading(false);
+        if (data.status === 'success' && onDone) setTimeout(onDone, 500);
+    };
+    return (<div className="card" style={{borderLeft:'4px solid #fbbf24'}}>
+        <h2>No compound data for {target}</h2>
+        <p style={{color:'#94a3b8',marginBottom:12}}>Fetch real bioactivity data from ChEMBL, or import your own assay CSV.</p>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
+            <button onClick={()=>fetch_data(target)} disabled={loading}
+                style={{padding:'10px 20px',background:'#2563eb',color:'white',border:'none',borderRadius:6,cursor:'pointer',fontSize:14}}>
+                {loading ? 'Fetching from ChEMBL...' : `Fetch ${target} data from ChEMBL`}
+            </button>
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+            <input value={customTarget} onChange={e=>setCustomTarget(e.target.value)}
+                placeholder="Or enter any target name (e.g. BRAF, EGFR, ALK)"
+                style={{flex:1,padding:'8px 12px',background:'#0f172a',color:'#e2e8f0',border:'1px solid #334155',borderRadius:6,fontSize:13}}/>
+            <button onClick={()=>customTarget && fetch_data(customTarget)} disabled={loading || !customTarget}
+                style={{padding:'8px 16px',background:'#334155',color:'#e2e8f0',border:'none',borderRadius:6,cursor:'pointer'}}>
+                Fetch</button>
+        </div>
+        {result && <div style={{marginTop:12,padding:12,borderRadius:6,
+            background:result.status==='success'?'#064e3b':'#7f1d1d'}}>
+            {result.status === 'success'
+                ? <div>Fetched <strong>{result.fetched}</strong> compounds from ChEMBL, ingested <strong>{result.ingested}</strong> into COS</div>
+                : <div>Error: {result.message}</div>}
+        </div>}
+    </div>);
+};
+
 // ── Target Profile Page ──────────────────────────────
 const TargetProfile = () => {
     const [targets, setTargets] = useState([]);
@@ -1165,15 +1205,7 @@ const TargetProfile = () => {
             </div>
         </div>
 
-        {profile.total_compounds === 0 && <div className="card" style={{borderLeft:'4px solid #fbbf24'}}>
-            <h2>No compound data for {profile.target}</h2>
-            <p style={{color:'#94a3b8'}}>This target was detected but has no associated compound or activity data yet. You can:</p>
-            <div style={{marginTop:8,display:'flex',gap:8,flexWrap:'wrap'}}>
-                <div className="chip" onClick={()=>{}}>Import assay data for {profile.target}</div>
-                <div className="chip" onClick={()=>{}}>Ingest a document mentioning {profile.target}</div>
-                <div className="chip" onClick={()=>{}}>Define {profile.target} as a concept</div>
-            </div>
-        </div>}
+        {profile.total_compounds === 0 && <ChEMBLFetcher target={profile.target} onDone={()=>switchTarget(profile.target)} />}
 
         <div className="card"><h2>Scaffold Families</h2>
             <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>

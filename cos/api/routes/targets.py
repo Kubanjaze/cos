@@ -319,6 +319,85 @@ def list_backups():
              "created": b.split(".backup.")[-1]} for b in backups]
 
 
+@router.post("/targets/fetch-chembl")
+def fetch_and_ingest_from_chembl(target_name: str = "", investigation_id: str = ""):
+    """Fetch real compound data from ChEMBL and ingest into COS."""
+    if not target_name:
+        return {"status": "error", "message": "target_name required"}
+
+    inv_id = investigation_id or f"inv-{target_name.lower()}"
+
+    # Step 1: Fetch from ChEMBL
+    from cos.memory.connectors import connector_registry
+    try:
+        compounds = connector_registry.fetch("chembl", target_name, investigation_id=inv_id)
+    except Exception as e:
+        return {"status": "error", "message": f"ChEMBL fetch failed: {e}"}
+
+    if not compounds or (len(compounds) == 1 and "error" in compounds[0]):
+        return {"status": "error", "message": compounds[0].get("error", "No data"), "compounds": 0}
+
+    # Step 2: Create investigation if needed
+    conn = sqlite3.connect(settings.db_path)
+    ts = time.strftime("%Y-%m-%dT%H:%M:%S")
+    conn.execute(
+        "INSERT OR IGNORE INTO investigations (id, title, domain, tags, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
+        (inv_id, f"{target_name} inhibitor program", "cheminformatics", target_name.lower(), "active", ts, ts),
+    )
+
+    # Step 3: Add target concept
+    concept_id = f"con-{uuid.uuid4().hex[:8]}"
+    target_info = compounds[0].get("target", target_name)
+    conn.execute(
+        "INSERT OR IGNORE INTO concepts (id, name, name_lower, definition, domain, category, confidence, source_ref, investigation_id, created_at, updated_at) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        (concept_id, target_name.upper(), target_name.lower(),
+         f"{target_info} — target with {len(compounds)} compounds in ChEMBL",
+         "cheminformatics", "target", 0.9, "chembl", inv_id, ts, ts),
+    )
+
+    # Step 4: Ingest compounds
+    ingested = 0
+    for comp in compounds:
+        name = comp.get("compound_name", comp.get("chembl_id", ""))
+        smiles = comp.get("smiles", "")
+        pic50 = comp.get("pic50")
+        if not name or pic50 is None:
+            continue
+
+        # Entity
+        eid = f"ent-{uuid.uuid4().hex[:8]}"
+        conn.execute(
+            "INSERT OR IGNORE INTO entities (id, entity_type, name, value, source_chunk_id, document_id, investigation_id, confidence, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            (eid, "compound", name, smiles or name, None, f"chembl-{target_name.lower()}", inv_id, 1.0, ts),
+        )
+
+        # Activity relation
+        rid = f"rel-{uuid.uuid4().hex[:8]}"
+        conn.execute(
+            "INSERT OR IGNORE INTO entity_relations (id, source_entity, relation_type, target_value, confidence, source_chunk_id, document_id, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (rid, name, "has_activity", f"pIC50={pic50}", 1.0, None, f"chembl-{target_name.lower()}", ts),
+        )
+
+        # Target entity
+        tid = f"ent-{uuid.uuid4().hex[:8]}"
+        conn.execute(
+            "INSERT OR IGNORE INTO entities (id, entity_type, name, value, source_chunk_id, document_id, investigation_id, confidence, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            (tid, "target", target_name.upper(), target_name.upper(), None, f"chembl-{target_name.lower()}", inv_id, 1.0, ts),
+        )
+
+        ingested += 1
+
+    conn.commit()
+    conn.close()
+
+    return {"status": "success", "target": target_name, "investigation_id": inv_id,
+            "fetched": len(compounds), "ingested": ingested}
+
+
 @router.get("/recommend/next")
 def recommend_next_compound():
     """Recommend what compound to make next based on SAR gaps."""

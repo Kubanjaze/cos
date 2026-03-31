@@ -119,9 +119,82 @@ class ConnectorRegistry:
         ]
 
     def _register_builtins(self):
-        """Register built-in stub connectors for supported databases."""
-        def _stub_chembl(query: str) -> list[dict]:
-            return [{"source": "chembl", "query": query, "note": "Stub: install chembl_webresource_client for live data"}]
+        """Register built-in connectors — ChEMBL is live, others are stubs."""
+
+        def _chembl_fetch(query: str) -> list[dict]:
+            """Fetch bioactivity data from ChEMBL REST API for a target name."""
+            import requests
+
+            # Step 1: Search for target
+            search_url = f"https://www.ebi.ac.uk/chembl/api/data/target/search.json?q={query}&limit=5"
+            resp = requests.get(search_url, timeout=15)
+            if resp.status_code != 200:
+                return [{"error": f"ChEMBL search failed: {resp.status_code}"}]
+
+            targets = resp.json().get("targets", [])
+            if not targets:
+                return [{"error": f"No targets found for '{query}'"}]
+
+            # Pick first single protein target
+            target_chembl_id = None
+            target_name = ""
+            for t in targets:
+                if t.get("target_type") == "SINGLE PROTEIN":
+                    target_chembl_id = t["target_chembl_id"]
+                    target_name = t.get("pref_name", query)
+                    break
+            if not target_chembl_id:
+                target_chembl_id = targets[0]["target_chembl_id"]
+                target_name = targets[0].get("pref_name", query)
+
+            # Step 2: Fetch bioactivities (IC50/Ki in nM)
+            act_url = (f"https://www.ebi.ac.uk/chembl/api/data/activity.json?"
+                       f"target_chembl_id={target_chembl_id}&standard_type__in=IC50,Ki&limit=100"
+                       f"&standard_units=nM&standard_relation==")
+            resp = requests.get(act_url, timeout=20)
+            if resp.status_code != 200:
+                return [{"error": f"ChEMBL activity fetch failed: {resp.status_code}"}]
+
+            activities = resp.json().get("activities", [])
+            results = []
+            seen = set()
+
+            for act in activities:
+                mol_id = act.get("molecule_chembl_id", "")
+                smiles = act.get("canonical_smiles", "")
+                std_value = act.get("standard_value")
+                std_type = act.get("standard_type", "IC50")
+                mol_name = act.get("molecule_pref_name") or mol_id
+
+                if not mol_id or not std_value or mol_id in seen:
+                    continue
+                seen.add(mol_id)
+
+                try:
+                    value_nm = float(std_value)
+                    # Convert to pIC50: -log10(IC50 in M) = -log10(IC50_nM * 1e-9)
+                    import math
+                    if value_nm > 0:
+                        pic50 = round(-math.log10(value_nm * 1e-9), 2)
+                    else:
+                        pic50 = None
+                except (ValueError, TypeError):
+                    pic50 = None
+
+                results.append({
+                    "compound_name": mol_name,
+                    "chembl_id": mol_id,
+                    "smiles": smiles,
+                    "activity_type": std_type,
+                    "activity_value_nM": std_value,
+                    "pic50": pic50,
+                    "target": target_name,
+                    "target_chembl_id": target_chembl_id,
+                    "source": "chembl",
+                })
+
+            logger.info(f"ChEMBL: fetched {len(results)} compounds for '{query}' ({target_chembl_id})")
+            return results
 
         def _stub_pubchem(query: str) -> list[dict]:
             return [{"source": "pubchem", "query": query, "note": "Stub: use pubchempy for live data"}]
@@ -129,7 +202,7 @@ class ConnectorRegistry:
         def _stub_uniprot(query: str) -> list[dict]:
             return [{"source": "uniprot", "query": query, "note": "Stub: use requests + UniProt REST API for live data"}]
 
-        self.register("chembl", _stub_chembl, domain="cheminformatics", description="ChEMBL compound/activity database")
+        self.register("chembl", _chembl_fetch, domain="cheminformatics", description="ChEMBL compound/activity database (LIVE)")
         self.register("pubchem", _stub_pubchem, domain="cheminformatics", description="PubChem compound database")
         self.register("uniprot", _stub_uniprot, domain="biology", description="UniProt protein database")
 
