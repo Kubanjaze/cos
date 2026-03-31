@@ -501,21 +501,77 @@ const Graph = () => {
     );
 };
 
-// ── Reasoning Page ────────────────────────────────────
+// ── Reasoning Page (interactive) ──────────────────────
 const Reasoning = () => {
     const [hyps, setHyps] = useState([]);
     const [insights, setInsights] = useState([]);
     const [uncertainty, setUncertainty] = useState(null);
     const [patterns, setPatterns] = useState(null);
-    useEffect(() => {
+    const [expandedHyp, setExpandedHyp] = useState(null);
+    const [challenge, setChallenge] = useState(null);
+    const [generating, setGenerating] = useState(false);
+    const [extracting, setExtracting] = useState(false);
+    const [multipass, setMultipass] = useState(null);
+    const [mpLoading, setMpLoading] = useState(false);
+
+    const reload = () => {
         api.get('/hypotheses').then(setHyps);
         api.get('/insights').then(setInsights);
         api.get('/uncertainty').then(setUncertainty);
         api.get('/patterns').then(setPatterns);
-    }, []);
+    };
+    useEffect(() => { reload(); }, []);
+
+    const generateHyps = async () => {
+        setGenerating(true);
+        await api.post('/hypotheses/generate');
+        reload(); setGenerating(false);
+    };
+    const extractInsights = async () => {
+        setExtracting(true);
+        await api.post('/insights/extract');
+        reload(); setExtracting(false);
+    };
+    const challengeHyp = async (id) => {
+        const r = await api.get(`/hypotheses/${id}/challenge`);
+        setChallenge(r);
+    };
+    const runMultipass = async () => {
+        setMpLoading(true);
+        const r = await api.post('/auto/investigate', {question:'Full SAR analysis across all targets',investigation_id:'default'});
+        setMultipass(r); setMpLoading(false);
+        reload();
+    };
+
     return (
         <div>
-            <div className="page-title">Reasoning</div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+                <div className="page-title" style={{marginBottom:0}}>Reasoning</div>
+                <div style={{display:'flex',gap:8}}>
+                    <button onClick={generateHyps} disabled={generating}
+                        style={{padding:'8px 14px',background:'#2563eb',color:'white',border:'none',borderRadius:6,cursor:'pointer',fontSize:12}}>
+                        {generating?'Generating...':'Generate Hypotheses'}</button>
+                    <button onClick={extractInsights} disabled={extracting}
+                        style={{padding:'8px 14px',background:'#7c3aed',color:'white',border:'none',borderRadius:6,cursor:'pointer',fontSize:12}}>
+                        {extracting?'Extracting...':'Extract Insights'}</button>
+                    <button onClick={runMultipass} disabled={mpLoading}
+                        style={{padding:'8px 14px',background:'#059669',color:'white',border:'none',borderRadius:6,cursor:'pointer',fontSize:12}}>
+                        {mpLoading?'Running...':'Run Full Analysis'}</button>
+                </div>
+            </div>
+
+            {/* Multi-pass result */}
+            {multipass && <div className="card" style={{borderLeft:'4px solid #059669'}}>
+                <h2>Analysis Complete ({multipass.duration_s}s, {(multipass.success_rate*100).toFixed(0)}% success)</h2>
+                {multipass.steps?.map((s,i) => (
+                    <div key={i} style={{display:'flex',gap:8,alignItems:'center',padding:4}}>
+                        <span className={s.status==='ok'?'step-ok':'step-fail'}>{s.status==='ok'?'✓':'✗'}</span>
+                        <strong>{s.phase}</strong> → {s.action||'?'}
+                    </div>
+                ))}
+            </div>}
+
+            {/* System confidence */}
             {uncertainty && <div className="card"><h2>System Confidence</h2>
                 <div className="grid">
                     <div className="stat"><div className="value">{(uncertainty.overall_confidence*100).toFixed(0)}%</div><div className="label">Overall</div></div>
@@ -524,40 +580,82 @@ const Reasoning = () => {
                     <div className="stat"><div className="value">{((1-uncertainty.overall_uncertainty)*100).toFixed(0)}%</div><div className="label">Certainty</div></div>
                 </div>
             </div>}
-            {patterns && patterns.scaffold_patterns && <div className="card"><h2>Scaffold Activity Patterns</h2>
+
+            {/* Scaffold patterns */}
+            {patterns && patterns.scaffold_patterns && <div className="card"><h2>Scaffold Activity Patterns ({patterns.scaffold_patterns.length})</h2>
                 <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                     {patterns.scaffold_patterns.map(p => (
-                        <div key={p.scaffold} style={{flex:'1 1 180px',background:'#0f172a',borderRadius:8,padding:12,border:'1px solid #334155'}}>
-                            <div style={{fontSize:18,fontWeight:700,color:'#38bdf8'}}>{p.scaffold}</div>
-                            <div style={{fontSize:12,color:'#64748b',marginBottom:8}}>{p.compounds} compounds</div>
+                        <div key={p.scaffold} style={{flex:'1 1 180px',background:'#0f172a',borderRadius:8,padding:12,
+                            border:'1px solid #334155',borderLeft:`4px solid ${getScaffoldColor(p.scaffold)}`}}>
+                            <div style={{fontSize:16,fontWeight:700,color:getScaffoldColor(p.scaffold)}}>{p.scaffold}</div>
+                            <div style={{fontSize:12,color:'#64748b',marginBottom:6}}>{p.compounds} compounds</div>
                             <div style={{display:'flex',justifyContent:'space-between',fontSize:13}}>
                                 <span>Avg pIC50</span><strong>{p.avg_pIC50}</strong>
                             </div>
                             <ConfBar value={p.avg_pIC50/10}/>
-                            <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'#64748b',marginTop:4}}>
-                                <span>Spread: {p.spread}</span><span className={`badge ${p.trend==='tight'?'badge-ok':'badge-warn'}`}>{p.trend}</span>
+                            <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#64748b',marginTop:4}}>
+                                <span>Spread: {p.spread}</span>
+                                <span className={`badge ${p.trend==='tight'?'badge-ok':'badge-warn'}`}>{p.trend}</span>
                             </div>
                         </div>
                     ))}
                 </div>
             </div>}
-            <div className="card"><h2>Hypotheses ({hyps.length})</h2>
+
+            {/* Hypotheses — click to expand + challenge */}
+            <div className="card">
+                <h2>Hypotheses ({hyps.length})</h2>
+                {hyps.length === 0 && <div style={{color:'#64748b'}}>No hypotheses yet. Click "Generate Hypotheses" above.</div>}
                 {hyps.map(h => (
-                    <div key={h.id} style={{background:'#0f172a',borderRadius:8,padding:14,marginBottom:10,borderLeft:`4px solid ${h.confidence>0.8?'#34d399':h.confidence>0.6?'#fbbf24':'#f87171'}`}}>
+                    <div key={h.id} style={{background:'#0f172a',borderRadius:8,padding:14,marginBottom:10,cursor:'pointer',
+                        borderLeft:`4px solid ${h.confidence>0.8?'#34d399':h.confidence>0.6?'#fbbf24':'#f87171'}`}}
+                        onClick={()=>setExpandedHyp(expandedHyp===h.id?null:h.id)}>
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
                             <span className={`badge ${h.status==='proposed'?'badge-info':'badge-ok'}`}>{h.status}</span>
-                            <span style={{fontSize:20,fontWeight:700,color:h.confidence>0.8?'#34d399':h.confidence>0.6?'#fbbf24':'#f87171'}}>{(h.confidence*100).toFixed(0)}%</span>
+                            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                                <span style={{fontSize:20,fontWeight:700,color:h.confidence>0.8?'#34d399':h.confidence>0.6?'#fbbf24':'#f87171'}}>
+                                    {(h.confidence*100).toFixed(0)}%</span>
+                                <span style={{color:'#475569'}}>{expandedHyp===h.id?'▼':'▶'}</span>
+                            </div>
                         </div>
                         <div style={{fontSize:14}}>{h.statement}</div>
                         <div style={{marginTop:6}}><ConfBar value={h.confidence}/></div>
+
+                        {expandedHyp === h.id && <div style={{marginTop:12,borderTop:'1px solid #334155',paddingTop:10}} onClick={e=>e.stopPropagation()}>
+                            <div style={{display:'flex',gap:8,marginBottom:10}}>
+                                <button onClick={()=>challengeHyp(h.id)}
+                                    style={{padding:'6px 12px',background:'#7f1d1d',color:'#f87171',border:'1px solid #f8717133',borderRadius:6,cursor:'pointer',fontSize:12}}>
+                                    Challenge this hypothesis</button>
+                                <button onClick={()=>api.post('/decisions',{title:`Test: ${h.statement.substring(0,50)}`,recommendation:h.statement,confidence:h.confidence})}
+                                    style={{padding:'6px 12px',background:'#064e3b',color:'#34d399',border:'1px solid #34d39933',borderRadius:6,cursor:'pointer',fontSize:12}}>
+                                    Create decision to test</button>
+                            </div>
+                            {challenge && challenge.hypothesis_id === h.id && <div>
+                                <div style={{fontSize:13,marginBottom:6}}>
+                                    Confidence: {challenge.original_confidence?.toFixed(2)} → <strong>{challenge.adjusted_confidence?.toFixed(2)}</strong>
+                                    {challenge.challenge_count > 0 && <span style={{color:'#f87171'}}> ({challenge.challenge_count} issue(s) found)</span>}
+                                </div>
+                                {challenge.challenges?.map((c,i) => (
+                                    <div key={i} style={{background:'#1e293b',padding:8,borderRadius:4,marginBottom:4,fontSize:12,borderLeft:'3px solid #f87171'}}>
+                                        <span className="badge badge-high">{c.type?.replace(/_/g,' ')}</span>
+                                        <div style={{marginTop:4}}>{c.detail}</div>
+                                    </div>
+                                ))}
+                                {challenge.challenge_count === 0 && <div style={{color:'#34d399',fontSize:12}}>No challenges found — hypothesis appears robust.</div>}
+                            </div>}
+                        </div>}
                     </div>
                 ))}
             </div>
-            <div className="card"><h2>Insights ({insights.length})</h2>
+
+            {/* Insights */}
+            <div className="card">
+                <h2>Insights ({insights.length})</h2>
+                {insights.length === 0 && <div style={{color:'#64748b'}}>No insights yet. Click "Extract Insights" above.</div>}
                 {insights.map(i => (
                     <div key={i.id} style={{background:'#0f172a',borderRadius:8,padding:12,marginBottom:8,borderLeft:`4px solid ${i.novelty>0.5?'#a78bfa':'#38bdf8'}`}}>
                         <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-                            <span className="badge badge-info">{i.type.replace(/_/g,' ')}</span>
+                            <span className="badge badge-info">{i.type?.replace(/_/g,' ')}</span>
                             <span style={{fontSize:13,color:'#a78bfa'}}>Novelty: {(i.novelty*100).toFixed(0)}%</span>
                         </div>
                         <div style={{fontSize:13}}>{i.description}</div>
