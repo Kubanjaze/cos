@@ -15,27 +15,36 @@ router = APIRouter()
 
 @router.get("/targets")
 def list_targets():
-    """List all known targets with compound counts."""
+    """List all known targets — from entities + concepts + known target names."""
     conn = sqlite3.connect(settings.db_path)
-    targets = conn.execute(
-        "SELECT DISTINCT name FROM entities WHERE entity_type='target' ORDER BY name"
+    target_names = set()
+
+    # From target entities
+    rows = conn.execute("SELECT DISTINCT name FROM entities WHERE entity_type='target'").fetchall()
+    for (name,) in rows:
+        target_names.add(name)
+
+    # From concepts explicitly categorized as targets
+    rows = conn.execute(
+        "SELECT DISTINCT name FROM concepts WHERE category='target'"
     ).fetchall()
+    for (name,) in rows:
+        target_names.add(name)
+
+    # Fallback: if still empty, add CETP as default (we know it's the project target)
+    if not target_names:
+        target_names.add("CETP")
+
+    compound_count = conn.execute(
+        "SELECT COUNT(DISTINCT name) FROM entities WHERE entity_type='compound'"
+    ).fetchone()[0]
 
     result = []
-    for (name,) in targets:
-        # Count compounds linked via relations
-        compound_count = conn.execute("""
-            SELECT COUNT(DISTINCT e.name) FROM entities e
-            JOIN entity_relations r ON e.name = r.source_entity
-            WHERE e.entity_type='compound' AND r.relation_type='has_activity'
-        """).fetchone()[0]
-
-        # Get concept definition if exists
+    for name in sorted(target_names):
         concept = conn.execute(
-            "SELECT definition, confidence FROM concepts WHERE name_lower=?",
+            "SELECT definition, confidence FROM concepts WHERE name_lower=? ORDER BY confidence DESC LIMIT 1",
             (name.lower(),),
         ).fetchone()
-
         result.append({
             "name": name, "compounds": compound_count,
             "definition": concept[0] if concept else None,
