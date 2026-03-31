@@ -26,14 +26,11 @@ def list_targets():
     for (name,) in rows:
         seen.add(name.upper())
 
-    # Source 2: Investigations — use the primary target name (first uppercase word only)
-    rows = conn.execute("SELECT id, title, domain FROM investigations").fetchall()
-    for inv_id, title, domain in rows:
-        words = title.replace("-", " ").split()
-        for word in words:
-            if len(word) >= 3 and word.upper() == word and word.upper() not in seen:
-                seen.add(word.upper())
-                break  # Only take the first uppercase word as the target name
+    # Source 2: Investigations — match investigation to known target entities/concepts only
+    # Don't blindly extract uppercase words — too many false positives (G12C, NSCLC, etc.)
+    inv_rows = conn.execute("SELECT id, title FROM investigations").fetchall()
+    # We only add targets that already appeared from Source 1 or Source 3
+    # Investigations are used later for scoping, not for target discovery
 
     # Source 3: Concepts that look like biological targets (not methods/metrics/AI)
     rows = conn.execute(
@@ -53,17 +50,27 @@ def list_targets():
             seen.add("UNKNOWN_TARGET")
 
     # Build target profiles — scope data per target
-    # Map targets to investigations if possible
+    # Map targets to investigations by matching target name in title OR investigation ID
     inv_map = {}
     for row in conn.execute("SELECT id, title FROM investigations").fetchall():
         for name in seen:
-            if name.lower() in row[1].lower():
+            if name.lower() in row[1].lower() or name.lower() in row[0].lower():
+                inv_map[name] = row[0]
+
+    # Also check: if entities exist with investigation_id containing target name
+    for name in seen:
+        if name not in inv_map:
+            row = conn.execute(
+                "SELECT DISTINCT investigation_id FROM entities WHERE investigation_id LIKE ? LIMIT 1",
+                (f"%{name.lower()}%",),
+            ).fetchone()
+            if row:
                 inv_map[name] = row[0]
 
     for name in sorted(seen):
         inv_id = inv_map.get(name)
 
-        # Count compounds scoped to this target's investigation (or all if no investigation)
+        # Always scope by investigation if we have one
         if inv_id:
             compounds = conn.execute("SELECT COUNT(DISTINCT name) FROM entities WHERE entity_type='compound' AND investigation_id=?", (inv_id,)).fetchone()[0]
             scaffolds = conn.execute("""
@@ -77,14 +84,7 @@ def list_targets():
                 WHERE r.relation_type='has_activity' AND e.investigation_id=?
             """, (inv_id,)).fetchone()[0]
         else:
-            # Check if this target has a concept — if it's the primary target, show all data
-            has_concept = conn.execute("SELECT COUNT(*) FROM concepts WHERE UPPER(name)=?", (name,)).fetchone()[0]
-            if has_concept > 0:
-                compounds = conn.execute("SELECT COUNT(DISTINCT name) FROM entities WHERE entity_type='compound'").fetchone()[0]
-                scaffolds = conn.execute("SELECT COUNT(DISTINCT target_value) FROM entity_relations WHERE relation_type='belongs_to_scaffold'").fetchone()[0]
-                activities = conn.execute("SELECT COUNT(*) FROM entity_relations WHERE relation_type='has_activity'").fetchone()[0]
-            else:
-                compounds, scaffolds, activities = 0, 0, 0
+            compounds, scaffolds, activities = 0, 0, 0
 
         concept = conn.execute(
             "SELECT definition, confidence FROM concepts WHERE UPPER(name)=? ORDER BY confidence DESC LIMIT 1",
@@ -120,29 +120,61 @@ def target_profile(target_name: str):
         "confidence": concept[3] if concept else None,
     }
 
-    # All scaffolds with activity data
-    scaffolds = conn.execute("""
-        SELECT r1.target_value as scaffold, COUNT(DISTINCT r1.source_entity) as compounds,
-               AVG(CAST(REPLACE(r2.target_value, 'pIC50=', '') AS REAL)) as avg_pic50,
-               MAX(CAST(REPLACE(r2.target_value, 'pIC50=', '') AS REAL)) as best
-        FROM entity_relations r1
-        JOIN entity_relations r2 ON r1.source_entity = r2.source_entity
-        WHERE r1.relation_type='belongs_to_scaffold' AND r2.relation_type='has_activity'
-        AND r2.target_value LIKE 'pIC50=%'
-        GROUP BY scaffold ORDER BY avg_pic50 DESC
-    """).fetchall()
+    # Find investigation for this target — match title OR ID
+    inv_row = conn.execute("SELECT id FROM investigations WHERE LOWER(title) LIKE ? OR LOWER(id) LIKE ?",
+                           (f"%{target_name.lower()}%", f"%{target_name.lower()}%")).fetchone()
+    if not inv_row:
+        inv_row = conn.execute(
+            "SELECT DISTINCT investigation_id FROM entities WHERE investigation_id LIKE ? LIMIT 1",
+            (f"%{target_name.lower()}%",),
+        ).fetchone()
+    inv_id = inv_row[0] if inv_row else None
+
+    # Scaffolds scoped to this target's investigation
+    if inv_id:
+        scaffolds = conn.execute("""
+            SELECT r1.target_value as scaffold, COUNT(DISTINCT r1.source_entity) as compounds,
+                   AVG(CAST(REPLACE(r2.target_value, 'pIC50=', '') AS REAL)) as avg_pic50,
+                   MAX(CAST(REPLACE(r2.target_value, 'pIC50=', '') AS REAL)) as best
+            FROM entity_relations r1
+            JOIN entity_relations r2 ON r1.source_entity = r2.source_entity
+            JOIN entities e ON r1.source_entity = e.name
+            WHERE r1.relation_type='belongs_to_scaffold' AND r2.relation_type='has_activity'
+            AND r2.target_value LIKE 'pIC50=%' AND e.investigation_id=?
+            GROUP BY scaffold ORDER BY avg_pic50 DESC
+        """, (inv_id,)).fetchall()
+    else:
+        scaffolds = conn.execute("""
+            SELECT r1.target_value as scaffold, COUNT(DISTINCT r1.source_entity) as compounds,
+                   AVG(CAST(REPLACE(r2.target_value, 'pIC50=', '') AS REAL)) as avg_pic50,
+                   MAX(CAST(REPLACE(r2.target_value, 'pIC50=', '') AS REAL)) as best
+            FROM entity_relations r1
+            JOIN entity_relations r2 ON r1.source_entity = r2.source_entity
+            WHERE r1.relation_type='belongs_to_scaffold' AND r2.relation_type='has_activity'
+            AND r2.target_value LIKE 'pIC50=%'
+            GROUP BY scaffold ORDER BY avg_pic50 DESC
+        """).fetchall()
     profile["scaffolds"] = [
         {"name": s[0], "compounds": s[1], "avg_pIC50": round(s[2], 2), "best_pIC50": round(s[3], 2)}
         for s in scaffolds
     ]
 
-    # Top compounds
-    top_compounds = conn.execute("""
-        SELECT r.source_entity, r.target_value
-        FROM entity_relations r WHERE r.relation_type='has_activity'
-        AND r.target_value LIKE 'pIC50=%'
-        ORDER BY CAST(REPLACE(r.target_value, 'pIC50=', '') AS REAL) DESC LIMIT 10
-    """).fetchall()
+    # Top compounds scoped to investigation
+    if inv_id:
+        top_compounds = conn.execute("""
+            SELECT r.source_entity, r.target_value
+            FROM entity_relations r
+            JOIN entities e ON r.source_entity = e.name
+            WHERE r.relation_type='has_activity' AND r.target_value LIKE 'pIC50=%' AND e.investigation_id=?
+            ORDER BY CAST(REPLACE(r.target_value, 'pIC50=', '') AS REAL) DESC LIMIT 10
+        """, (inv_id,)).fetchall()
+    else:
+        top_compounds = conn.execute("""
+            SELECT r.source_entity, r.target_value
+            FROM entity_relations r WHERE r.relation_type='has_activity'
+            AND r.target_value LIKE 'pIC50=%'
+            ORDER BY CAST(REPLACE(r.target_value, 'pIC50=', '') AS REAL) DESC LIMIT 10
+        """).fetchall()
     profile["top_compounds"] = [
         {"name": c[0], "activity": c[1]} for c in top_compounds
     ]
@@ -169,9 +201,15 @@ def target_profile(target_name: str):
     except Exception:
         profile["decisions"] = []
 
-    # Total counts
-    profile["total_compounds"] = conn.execute("SELECT COUNT(DISTINCT name) FROM entities WHERE entity_type='compound'").fetchone()[0]
-    profile["total_relations"] = conn.execute("SELECT COUNT(*) FROM entity_relations").fetchone()[0]
+    # Total counts scoped to investigation
+    if inv_id:
+        profile["total_compounds"] = conn.execute("SELECT COUNT(DISTINCT name) FROM entities WHERE entity_type='compound' AND investigation_id=?", (inv_id,)).fetchone()[0]
+        profile["total_relations"] = conn.execute("""
+            SELECT COUNT(*) FROM entity_relations r JOIN entities e ON r.source_entity=e.name WHERE e.investigation_id=?
+        """, (inv_id,)).fetchone()[0]
+    else:
+        profile["total_compounds"] = 0
+        profile["total_relations"] = 0
 
     conn.close()
     return profile
