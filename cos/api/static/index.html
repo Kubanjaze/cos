@@ -89,6 +89,10 @@ const Sidebar = ({ page, setPage }) => (
         <div className="section">Execution</div>
         <a className={page==='workflows'?'active':''} onClick={()=>setPage('workflows')}>Workflows</a>
         <a className={page==='autonomous'?'active':''} onClick={()=>setPage('autonomous')}>Autonomous</a>
+        <div className="section">Drug Discovery</div>
+        <a className={page==='target'?'active':''} onClick={()=>setPage('target')}>Target Profile</a>
+        <a className={page==='recommend'?'active':''} onClick={()=>setPage('recommend')}>What to Make</a>
+        <a className={page==='assay-import'?'active':''} onClick={()=>setPage('assay-import')}>Import Assay</a>
         <div className="section">Chemistry</div>
         <a className={page==='compounds'?'active':''} onClick={()=>setPage('compounds')}>Compounds</a>
         <a className={page==='similarity'?'active':''} onClick={()=>setPage('similarity')}>Similarity</a>
@@ -1121,6 +1125,163 @@ const ActivityCliffs = () => {
     </div>);
 };
 
+// ── Target Profile Page ──────────────────────────────
+const TargetProfile = () => {
+    const [profile, setProfile] = useState(null);
+    useEffect(() => { api.get('/targets/CETP').then(setProfile); }, []);
+    if (!profile) return <div className="loading">Loading target profile...</div>;
+    return (<div>
+        <div className="page-title">Target: {profile.target}</div>
+        <div className="card" style={{borderLeft:'4px solid #38bdf8'}}>
+            <h3>{profile.target}</h3>
+            <div style={{fontSize:14,color:'#94a3b8',marginTop:4}}>{profile.definition}</div>
+            <div style={{display:'flex',gap:20,marginTop:12}}>
+                <div className="stat"><div className="value">{profile.total_compounds}</div><div className="label">Compounds</div></div>
+                <div className="stat"><div className="value">{profile.total_relations}</div><div className="label">Relations</div></div>
+                <div className="stat"><div className="value">{profile.scaffolds.length}</div><div className="label">Scaffolds</div></div>
+                {profile.confidence && <div className="stat"><div className="value">{(profile.confidence*100).toFixed(0)}%</div><div className="label">Confidence</div></div>}
+            </div>
+        </div>
+
+        <div className="card"><h2>Scaffold Families</h2>
+            <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+                {profile.scaffolds.map(s => (
+                    <div key={s.name} style={{flex:'1 1 200px',background:'#0f172a',borderRadius:8,padding:12,
+                        borderLeft:`4px solid ${SCAFFOLD_COLORS[s.name]||'#38bdf8'}`}}>
+                        <div style={{fontSize:18,fontWeight:700,color:SCAFFOLD_COLORS[s.name]||'#38bdf8'}}>{s.name}</div>
+                        <div style={{fontSize:12,color:'#64748b'}}>{s.compounds} compounds</div>
+                        <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginTop:6}}>
+                            <span>Avg pIC50</span><strong>{s.avg_pIC50}</strong>
+                        </div>
+                        <ConfBar value={s.avg_pIC50/10}/>
+                        <div style={{fontSize:11,color:'#64748b',marginTop:4}}>Best: {s.best_pIC50}</div>
+                    </div>
+                ))}
+            </div>
+        </div>
+
+        <div className="card"><h2>Top Compounds</h2>
+            <table><thead><tr><th>Rank</th><th>Compound</th><th>Activity</th></tr></thead>
+            <tbody>{profile.top_compounds.map((c,i) => (
+                <tr key={i}><td><strong>#{i+1}</strong></td><td>{c.name}</td>
+                <td><span style={{color:'#34d399'}}>{c.activity}</span></td></tr>
+            ))}</tbody></table>
+        </div>
+
+        {profile.hypotheses.length > 0 && <div className="card"><h2>Hypotheses</h2>
+            {profile.hypotheses.map(h => (
+                <div key={h.id} style={{background:'#0f172a',padding:10,borderRadius:6,marginBottom:6,
+                    borderLeft:`3px solid ${h.confidence>0.8?'#34d399':'#fbbf24'}`}}>
+                    <div style={{display:'flex',justifyContent:'space-between'}}>
+                        <span className="badge badge-info">{h.status}</span>
+                        <span style={{color:h.confidence>0.8?'#34d399':'#fbbf24'}}>{(h.confidence*100).toFixed(0)}%</span>
+                    </div>
+                    <div style={{fontSize:13,marginTop:4}}>{h.statement.substring(0,100)}</div>
+                </div>
+            ))}
+        </div>}
+
+        {profile.decisions.length > 0 && <div className="card"><h2>Active Decisions</h2>
+            {profile.decisions.map(d => (
+                <div key={d.id} style={{background:'#0f172a',padding:10,borderRadius:6,marginBottom:6}}>
+                    <div style={{display:'flex',justifyContent:'space-between'}}>
+                        <strong>{d.title}</strong>
+                        <span className="badge badge-info">{d.status}</span>
+                    </div>
+                </div>
+            ))}
+        </div>}
+    </div>);
+};
+
+// ── Recommender Page ────────────────────────────────
+const Recommend = () => {
+    const [recs, setRecs] = useState([]);
+    const [loading, setLoading] = useState(true);
+    useEffect(() => { api.get('/recommend/next').then(d => { setRecs(d); setLoading(false); }); }, []);
+    const effortColor = {low:'#34d399',medium:'#fbbf24',high:'#f87171'};
+    return (<div>
+        <div className="page-title">What to Make Next</div>
+        {loading ? <div className="loading">Analyzing SAR data...</div> :
+        <div>
+            {recs.map((r,i) => (
+                <div key={i} className="card" style={{borderLeft:`4px solid ${i===0?'#34d399':'#334155'}`}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                        <div>
+                            <span style={{fontSize:18,fontWeight:700,color:'#f1f5f9'}}>#{i+1} </span>
+                            <span style={{fontSize:15,fontWeight:600,color:'#38bdf8'}}>{r.strategy.replace(/_/g,' ')}</span>
+                        </div>
+                        <div style={{display:'flex',gap:6}}>
+                            <span className="badge badge-info">Priority: {(r.priority*100).toFixed(0)}%</span>
+                            <span className="badge" style={{background:effortColor[r.effort]+'33',color:effortColor[r.effort]}}>Effort: {r.effort}</span>
+                        </div>
+                    </div>
+                    <div style={{fontSize:14,lineHeight:1.6}}>{r.rationale}</div>
+                    {r.scaffold && <div style={{marginTop:8,fontSize:13,color:'#64748b'}}>Scaffold: <strong style={{color:SCAFFOLD_COLORS[r.scaffold]||'#38bdf8'}}>{r.scaffold}</strong></div>}
+                    {r.compounds && <div style={{marginTop:6,fontSize:13,color:'#64748b'}}>Compounds: {r.compounds.join(', ')}</div>}
+                    {r.scaffolds && <div style={{marginTop:6,fontSize:13,color:'#64748b'}}>Scaffolds: {r.scaffolds.join(' + ')}</div>}
+                </div>
+            ))}
+        </div>}
+    </div>);
+};
+
+// ── Assay Import Page ───────────────────────────────
+const AssayImport = () => {
+    const [result, setResult] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const handleUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        setLoading(true);
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('investigation_id', 'default');
+        try {
+            const resp = await fetch('/api/assay/import', { method: 'POST', body: formData });
+            const data = await resp.json();
+            setResult(data);
+        } catch (err) {
+            setResult({ status: 'error', message: err.message });
+        }
+        setLoading(false);
+    };
+    return (<div>
+        <div className="page-title">Import Assay Data</div>
+        <div className="card">
+            <h2>Upload CSV</h2>
+            <p style={{color:'#94a3b8',marginBottom:12}}>
+                Upload a CSV file with assay data. Expected columns:<br/>
+                <code style={{color:'#38bdf8'}}>compound_name, activity_type, activity_value</code> (optionally: smiles, unit)
+            </p>
+            <div style={{padding:24,border:'2px dashed #334155',borderRadius:8,textAlign:'center',cursor:'pointer',position:'relative'}}>
+                <input type="file" accept=".csv" onChange={handleUpload}
+                       style={{position:'absolute',inset:0,opacity:0,cursor:'pointer'}}/>
+                <div style={{fontSize:32}}>📁</div>
+                <div style={{fontSize:14,color:'#94a3b8',marginTop:8}}>{loading ? 'Importing...' : 'Click or drag CSV file here'}</div>
+            </div>
+            {result && <div style={{marginTop:12,padding:12,borderRadius:6,
+                background:result.status==='success'?'#064e3b':'#7f1d1d'}}>
+                {result.status === 'success' ? (
+                    <div>Imported <strong>{result.imported}</strong> records from {result.filename}</div>
+                ) : (
+                    <div>Error: {result.message}</div>
+                )}
+            </div>}
+        </div>
+        <div className="card">
+            <h2>CSV Format Example</h2>
+            <pre style={{background:'#0f172a',padding:12,borderRadius:6,fontSize:12,overflow:'auto'}}>
+{`compound_name,activity_type,activity_value
+benz_013_NH2,pIC50,7.45
+benz_014_OEt,pIC50,6.80
+new_compound_1,IC50,50
+new_compound_2,IC50,120`}
+            </pre>
+        </div>
+    </div>);
+};
+
 // ── Ingest Page ──────────────────────────────────────
 const Ingest = () => {
     const [filePath, setFilePath] = useState('');
@@ -1229,6 +1390,7 @@ const App = () => {
         documents: () => <Documents />, episodes: () => <Episodes />,
         provenance: () => <Provenance />,
         sar: () => <SAR />, report: () => <Report />,
+        target: () => <TargetProfile />, recommend: () => <Recommend />, "assay-import": () => <AssayImport />,
         compounds: () => <Compounds />, similarity: () => <Similarity />, cliffs: () => <ActivityCliffs />,
         ingest: () => <Ingest />,
         conflicts: () => <Conflicts />, "low-confidence": () => <LowConfidence />,

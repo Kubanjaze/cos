@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from cos.api.routes import core, memory, reasoning, workflow, decision, autonomy, sar, chemistry
+from cos.api.routes import core, memory, reasoning, workflow, decision, autonomy, sar, chemistry, targets
 
 app = FastAPI(
     title="COS — Cognitive Operating System",
@@ -37,6 +37,7 @@ app.include_router(decision.router, prefix="/api", tags=["Decision"])
 app.include_router(autonomy.router, prefix="/api", tags=["Autonomy"])
 app.include_router(sar.router, prefix="/api", tags=["SAR Analysis"])
 app.include_router(chemistry.router, prefix="/api", tags=["Chemistry"])
+app.include_router(targets.router, prefix="/api", tags=["Targets"])
 
 # Serve static frontend
 static_dir = Path(__file__).parent / "static"
