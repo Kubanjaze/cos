@@ -1355,59 +1355,201 @@ const Recommend = () => {
     </div>);
 };
 
-// ── Assay Import Page ───────────────────────────────
+// ── Assay Import Page (preview + column mapping + filter + rollback) ──
 const AssayImport = () => {
+    const [step, setStep] = useState('upload'); // upload → preview → mapping → importing → done
+    const [file, setFile] = useState(null);
+    const [preview, setPreview] = useState(null);
+    const [allRows, setAllRows] = useState([]);
+    const [filteredRows, setFilteredRows] = useState([]);
+    const [columns, setColumns] = useState([]);
+    const [mapping, setMapping] = useState({compound:'',activity:'',activity_type:'',smiles:''});
+    const [filterCol, setFilterCol] = useState('');
+    const [filterVal, setFilterVal] = useState('');
     const [result, setResult] = useState(null);
+    const [backups, setBackups] = useState([]);
     const [loading, setLoading] = useState(false);
-    const handleUpload = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        setLoading(true);
+
+    useEffect(() => { api.get('/assay/backups').then(setBackups); }, []);
+
+    // Step 1: Upload + preview
+    const handleFile = async (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        setFile(f); setLoading(true);
         const formData = new FormData();
-        formData.append('file', file);
-        formData.append('investigation_id', 'default');
-        try {
-            const resp = await fetch('/api/assay/import', { method: 'POST', body: formData });
-            const data = await resp.json();
-            setResult(data);
-        } catch (err) {
-            setResult({ status: 'error', message: err.message });
-        }
-        setLoading(false);
+        formData.append('file', f);
+        const resp = await fetch('/api/assay/preview', { method: 'POST', body: formData });
+        const data = await resp.json();
+        setColumns(data.columns || []);
+        setPreview(data.preview || []);
+        setAllRows(data.all_rows || []);
+        setFilteredRows(data.all_rows || []);
+        // Auto-map columns
+        const cols = (data.columns || []).map(c => c.toLowerCase());
+        setMapping({
+            compound: data.columns[cols.findIndex(c => c.includes('compound') || c.includes('name'))] || data.columns[0] || '',
+            activity: data.columns[cols.findIndex(c => c.includes('activity') || c.includes('pic50') || c.includes('ic50') || c.includes('value'))] || '',
+            activity_type: data.columns[cols.findIndex(c => c.includes('type'))] || '',
+            smiles: data.columns[cols.findIndex(c => c.includes('smiles') || c.includes('smi'))] || '',
+        });
+        setStep('preview'); setLoading(false);
     };
+
+    // Apply filter
+    const applyFilter = () => {
+        if (!filterCol || !filterVal) { setFilteredRows(allRows); return; }
+        const val = filterVal.toLowerCase();
+        setFilteredRows(allRows.filter(r => (r[filterCol] || '').toLowerCase().includes(val)));
+    };
+    useEffect(() => { applyFilter(); }, [filterCol, filterVal]);
+
+    // Step 3: Import
+    const runImport = async () => {
+        setLoading(true);
+        // Build filtered CSV
+        const header = columns.join(',');
+        const rows = filteredRows.map(r => columns.map(c => r[c] || '').join(',')).join('\n');
+        const csvText = header + '\n' + rows;
+        const blob = new Blob([csvText], { type: 'text/csv' });
+        const formData = new FormData();
+        formData.append('file', blob, file ? file.name : 'filtered.csv');
+        formData.append('investigation_id', 'default');
+        formData.append('compound_col', mapping.compound);
+        formData.append('activity_col', mapping.activity);
+        formData.append('activity_type_col', mapping.activity_type);
+        formData.append('smiles_col', mapping.smiles);
+        const resp = await fetch('/api/assay/import', { method: 'POST', body: formData });
+        const data = await resp.json();
+        setResult(data); setStep('done'); setLoading(false);
+        api.get('/assay/backups').then(setBackups);
+    };
+
+    // Rollback
+    const rollback = async (path) => {
+        const resp = await fetch('/api/assay/rollback', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({backup_path: path || ''})
+        });
+        const data = await resp.json();
+        alert(data.status === 'success' ? 'Database restored from backup.' : `Error: ${data.message}`);
+    };
+
     return (<div>
         <div className="page-title">Import Assay Data</div>
-        <div className="card">
-            <h2>Upload CSV</h2>
-            <p style={{color:'#94a3b8',marginBottom:12}}>
-                Upload a CSV file with assay data. Expected columns:<br/>
-                <code style={{color:'#38bdf8'}}>compound_name, activity_type, activity_value</code> (optionally: smiles, unit)
-            </p>
-            <div style={{padding:24,border:'2px dashed #334155',borderRadius:8,textAlign:'center',cursor:'pointer',position:'relative'}}>
-                <input type="file" accept=".csv" onChange={handleUpload}
-                       style={{position:'absolute',inset:0,opacity:0,cursor:'pointer'}}/>
-                <div style={{fontSize:32}}>📁</div>
-                <div style={{fontSize:14,color:'#94a3b8',marginTop:8}}>{loading ? 'Importing...' : 'Click or drag CSV file here'}</div>
+
+        {/* Step 1: Upload */}
+        {step === 'upload' && <div>
+            <div className="card">
+                <h2>Step 1: Upload CSV</h2>
+                <p style={{color:'#94a3b8',marginBottom:12}}>Upload a CSV file with compound assay data. COS will auto-detect columns and let you map them before importing.</p>
+                <div style={{padding:32,border:'2px dashed #334155',borderRadius:8,textAlign:'center',cursor:'pointer',position:'relative'}}>
+                    <input type="file" accept=".csv" onChange={handleFile} style={{position:'absolute',inset:0,opacity:0,cursor:'pointer'}}/>
+                    <div style={{fontSize:36}}>📁</div>
+                    <div style={{fontSize:14,color:'#94a3b8',marginTop:8}}>{loading ? 'Reading file...' : 'Click or drag CSV file here'}</div>
+                </div>
             </div>
-            {result && <div style={{marginTop:12,padding:12,borderRadius:6,
-                background:result.status==='success'?'#064e3b':'#7f1d1d'}}>
-                {result.status === 'success' ? (
-                    <div>Imported <strong>{result.imported}</strong> records from {result.filename}</div>
-                ) : (
-                    <div>Error: {result.message}</div>
+            <div className="card">
+                <h2>CSV Format Example</h2>
+                <pre style={{background:'#0f172a',padding:12,borderRadius:6,fontSize:12,overflow:'auto'}}>
+{`compound_name,smiles,activity_type,activity_value
+benz_013_NH2,C=CC(=O)Nc1ccc(N)cc1,pIC50,7.45
+benz_014_OEt,C=CC(=O)Nc1ccc(OCC)cc1,pIC50,6.80`}</pre>
+            </div>
+        </div>}
+
+        {/* Step 2: Preview + Filter + Column Mapping */}
+        {step === 'preview' && preview && <div>
+            <div className="card">
+                <h2>Step 2: Preview & Filter ({filteredRows.length} of {allRows.length} rows)</h2>
+                <div style={{display:'flex',gap:8,marginBottom:12,alignItems:'center'}}>
+                    <select value={filterCol} onChange={e=>setFilterCol(e.target.value)}
+                        style={{padding:8,background:'#0f172a',color:'#e2e8f0',border:'1px solid #334155',borderRadius:6}}>
+                        <option value="">Filter by column...</option>
+                        {columns.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    {filterCol && <input value={filterVal} onChange={e=>setFilterVal(e.target.value)}
+                        placeholder={`Filter ${filterCol}...`}
+                        style={{flex:1,padding:8,background:'#0f172a',color:'#e2e8f0',border:'1px solid #334155',borderRadius:6}}/>}
+                    {filterCol && <button onClick={()=>{setFilterCol('');setFilterVal('');setFilteredRows(allRows);}}
+                        style={{padding:'8px 12px',background:'#334155',color:'#94a3b8',border:'none',borderRadius:6,cursor:'pointer'}}>Clear</button>}
+                </div>
+                <div style={{overflowX:'auto',maxHeight:300,overflowY:'auto'}}>
+                    <table><thead><tr>{columns.map(c => <th key={c}>{c}</th>)}</tr></thead>
+                    <tbody>{filteredRows.slice(0,20).map((r,i) => (
+                        <tr key={i}>{columns.map(c => <td key={c}>{(r[c]||'').substring(0,40)}</td>)}</tr>
+                    ))}</tbody></table>
+                    {filteredRows.length > 20 && <div style={{color:'#64748b',marginTop:4}}>...{filteredRows.length-20} more rows</div>}
+                </div>
+            </div>
+
+            <div className="card">
+                <h2>Step 3: Map Columns</h2>
+                <p style={{color:'#94a3b8',marginBottom:12}}>Tell COS which column is which. Auto-detected mappings shown — adjust if needed.</p>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                    {[{key:'compound',label:'Compound Name *',required:true},
+                      {key:'activity',label:'Activity Value *',required:true},
+                      {key:'activity_type',label:'Activity Type (pIC50, IC50...)'},
+                      {key:'smiles',label:'SMILES (optional)'}].map(({key,label,required}) => (
+                        <div key={key}>
+                            <div style={{fontSize:12,color:'#94a3b8',marginBottom:4}}>{label}</div>
+                            <select value={mapping[key]} onChange={e=>setMapping({...mapping,[key]:e.target.value})}
+                                style={{width:'100%',padding:8,background:'#0f172a',color:mapping[key]?'#e2e8f0':'#475569',
+                                border:`1px solid ${required && !mapping[key]?'#f87171':'#334155'}`,borderRadius:6}}>
+                                <option value="">-- select --</option>
+                                {columns.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
+                    ))}
+                </div>
+                <div style={{display:'flex',gap:8,marginTop:16}}>
+                    <button onClick={()=>setStep('upload')} style={{padding:'10px 20px',background:'#334155',color:'#94a3b8',border:'none',borderRadius:6,cursor:'pointer'}}>Back</button>
+                    <button onClick={runImport} disabled={!mapping.compound || !mapping.activity || loading}
+                        style={{padding:'10px 24px',background:'#2563eb',color:'white',border:'none',borderRadius:6,cursor:'pointer',fontSize:14}}>
+                        {loading ? 'Importing...' : `Import ${filteredRows.length} rows`}</button>
+                </div>
+            </div>
+        </div>}
+
+        {/* Step 3: Results */}
+        {step === 'done' && result && <div>
+            <div className="card" style={{borderLeft:`4px solid ${result.status==='success'?'#34d399':'#f87171'}`}}>
+                <h2>{result.status === 'success' ? 'Import Complete' : 'Import Failed'}</h2>
+                {result.status === 'success' ? (<div>
+                    <div className="grid" style={{marginBottom:12}}>
+                        <div className="stat"><div className="value" style={{color:'#34d399'}}>{result.imported}</div><div className="label">Imported</div></div>
+                        <div className="stat"><div className="value" style={{color:'#fbbf24'}}>{result.skipped}</div><div className="label">Skipped</div></div>
+                        <div className="stat"><div className="value" style={{color:'#f87171'}}>{(result.errors||[]).length}</div><div className="label">Errors</div></div>
+                    </div>
+                    <div style={{fontSize:12,color:'#64748b'}}>Backup saved: {result.backup_path}</div>
+                    {result.errors && result.errors.length > 0 && <div style={{marginTop:8}}>
+                        <h3 style={{color:'#f87171'}}>Errors:</h3>
+                        {result.errors.map((e,i) => <div key={i} style={{fontSize:12,color:'#f87171'}}>Row {e.row}: {e.compound} — {e.error}</div>)}
+                    </div>}
+                </div>) : (
+                    <div style={{color:'#f87171'}}>{result.message}</div>
                 )}
-            </div>}
-        </div>
-        <div className="card">
-            <h2>CSV Format Example</h2>
-            <pre style={{background:'#0f172a',padding:12,borderRadius:6,fontSize:12,overflow:'auto'}}>
-{`compound_name,activity_type,activity_value
-benz_013_NH2,pIC50,7.45
-benz_014_OEt,pIC50,6.80
-new_compound_1,IC50,50
-new_compound_2,IC50,120`}
-            </pre>
-        </div>
+                <div style={{display:'flex',gap:8,marginTop:12}}>
+                    <button onClick={()=>{setStep('upload');setResult(null);setPreview(null);}}
+                        style={{padding:'8px 16px',background:'#2563eb',color:'white',border:'none',borderRadius:6,cursor:'pointer'}}>Import More</button>
+                    {result.status === 'success' && <button onClick={()=>rollback(result.backup_path)}
+                        style={{padding:'8px 16px',background:'#7f1d1d',color:'#f87171',border:'1px solid #f8717155',borderRadius:6,cursor:'pointer'}}>
+                        Undo Import (Rollback)</button>}
+                </div>
+            </div>
+        </div>}
+
+        {/* Backups section */}
+        {backups.length > 0 && <div className="card">
+            <h2>Database Backups ({backups.length})</h2>
+            <table><thead><tr><th>Created</th><th>Size</th><th>Action</th></tr></thead>
+            <tbody>{backups.slice(0,5).map((b,i) => (
+                <tr key={i}><td>{b.created}</td><td>{(b.size/1024).toFixed(0)} KB</td>
+                <td><button onClick={()=>rollback(b.path)}
+                    style={{padding:'4px 10px',background:'#334155',color:'#94a3b8',border:'none',borderRadius:4,cursor:'pointer',fontSize:11}}>
+                    Restore</button></td></tr>
+            ))}</tbody></table>
+        </div>}
     </div>);
 };
 

@@ -121,55 +121,147 @@ def target_profile(target_name: str):
     return profile
 
 
-@router.post("/assay/import")
-async def import_assay_data(file: UploadFile = File(...), investigation_id: str = Form("default")):
-    """Import assay data from CSV. Expects columns: compound_name, smiles (optional), activity_type, activity_value, unit."""
+@router.post("/assay/preview")
+async def preview_assay_data(file: UploadFile = File(...)):
+    """Preview CSV file: return columns, row count, and first 10 rows for mapping."""
     content = await file.read()
-    text = content.decode("utf-8")
+    text = content.decode("utf-8", errors="replace")
+    reader = csv.DictReader(io.StringIO(text))
+    columns = reader.fieldnames or []
+    rows = []
+    for i, row in enumerate(reader):
+        if i >= 100:
+            break
+        rows.append(dict(row))
+    return {"columns": columns, "row_count": len(rows), "preview": rows[:10], "all_rows": rows}
+
+
+@router.post("/assay/import")
+async def import_assay_data(file: UploadFile = File(...), investigation_id: str = Form("default"),
+                             compound_col: str = Form("compound_name"),
+                             activity_col: str = Form("activity_value"),
+                             activity_type_col: str = Form(""),
+                             smiles_col: str = Form("")):
+    """Import assay data with column mapping. Creates backup before import."""
+    import shutil, os
+
+    # Step 1: Backup database
+    db_path = settings.db_path
+    backup_path = db_path + f".backup.{time.strftime('%Y%m%d_%H%M%S')}"
+    try:
+        shutil.copy2(db_path, backup_path)
+        backup_size = os.path.getsize(backup_path)
+    except Exception as e:
+        return {"status": "error", "message": f"Backup failed: {e}"}
+
+    # Step 2: Parse CSV
+    content = await file.read()
+    text = content.decode("utf-8", errors="replace")
     reader = csv.DictReader(io.StringIO(text))
 
-    conn = sqlite3.connect(settings.db_path)
+    conn = sqlite3.connect(db_path)
     ts = time.strftime("%Y-%m-%dT%H:%M:%S")
     imported = 0
+    skipped = 0
+    errors = []
 
-    for row in reader:
-        compound = row.get("compound_name", row.get("name", ""))
-        act_type = row.get("activity_type", "pIC50")
-        act_value = row.get("activity_value", row.get("pic50", row.get("pIC50", "")))
-        if not compound or not act_value:
-            continue
+    try:
+        for row_num, row in enumerate(reader, 1):
+            compound = row.get(compound_col, "").strip()
+            act_value = row.get(activity_col, "").strip()
+            if not compound or not act_value:
+                skipped += 1
+                continue
 
-        # Insert as entity if not exists
-        ent_id = f"ent-{uuid.uuid4().hex[:8]}"
-        conn.execute(
-            "INSERT OR IGNORE INTO entities (id, entity_type, name, value, source_chunk_id, document_id, investigation_id, confidence, created_at) "
-            "VALUES (?, 'compound', ?, ?, NULL, 'assay-import', ?, 1.0, ?)",
-            (ent_id, compound, compound, investigation_id, ts),
-        )
+            act_type = row.get(activity_type_col, "pIC50").strip() if activity_type_col else "pIC50"
+            smiles = row.get(smiles_col, "").strip() if smiles_col else ""
 
-        # Insert activity relation
-        rel_id = f"rel-{uuid.uuid4().hex[:8]}"
-        conn.execute(
-            "INSERT OR IGNORE INTO entity_relations (id, source_entity, relation_type, target_value, confidence, source_chunk_id, document_id, created_at) "
-            "VALUES (?, ?, 'has_activity', ?, 1.0, NULL, 'assay-import', ?)",
-            (rel_id, compound, f"{act_type}={act_value}", ts),
-        )
+            try:
+                # Insert entity
+                ent_id = f"ent-{uuid.uuid4().hex[:8]}"
+                conn.execute(
+                    "INSERT OR IGNORE INTO entities (id, entity_type, name, value, source_chunk_id, document_id, investigation_id, confidence, created_at) "
+                    "VALUES (?, 'compound', ?, ?, NULL, 'assay-import', ?, 1.0, ?)",
+                    (ent_id, compound, smiles or compound, investigation_id, ts),
+                )
 
-        # Insert scaffold relation from name prefix
-        prefix = compound.split("_")[0] if "_" in compound else None
-        if prefix:
-            scaf_id = f"rel-{uuid.uuid4().hex[:8]}"
-            conn.execute(
-                "INSERT OR IGNORE INTO entity_relations (id, source_entity, relation_type, target_value, confidence, source_chunk_id, document_id, created_at) "
-                "VALUES (?, ?, 'belongs_to_scaffold', ?, 1.0, NULL, 'assay-import', ?)",
-                (scaf_id, compound, prefix, ts),
-            )
+                # Insert activity
+                rel_id = f"rel-{uuid.uuid4().hex[:8]}"
+                conn.execute(
+                    "INSERT OR IGNORE INTO entity_relations (id, source_entity, relation_type, target_value, confidence, source_chunk_id, document_id, created_at) "
+                    "VALUES (?, ?, 'has_activity', ?, 1.0, NULL, 'assay-import', ?)",
+                    (rel_id, compound, f"{act_type}={act_value}", ts),
+                )
 
-        imported += 1
+                # Scaffold from name prefix
+                prefix = compound.split("_")[0] if "_" in compound else None
+                if prefix:
+                    scaf_id = f"rel-{uuid.uuid4().hex[:8]}"
+                    conn.execute(
+                        "INSERT OR IGNORE INTO entity_relations (id, source_entity, relation_type, target_value, confidence, source_chunk_id, document_id, created_at) "
+                        "VALUES (?, ?, 'belongs_to_scaffold', ?, 1.0, NULL, 'assay-import', ?)",
+                        (scaf_id, compound, prefix, ts),
+                    )
 
-    conn.commit()
+                imported += 1
+            except Exception as e:
+                errors.append({"row": row_num, "compound": compound, "error": str(e)[:80]})
+                if len(errors) > 20:
+                    break
+
+        conn.commit()
+    except Exception as e:
+        conn.close()
+        # Restore backup on failure
+        try:
+            shutil.copy2(backup_path, db_path)
+        except Exception:
+            pass
+        return {"status": "error", "message": f"Import failed (backup restored): {e}",
+                "backup_path": backup_path}
+
     conn.close()
-    return {"status": "success", "imported": imported, "filename": file.filename}
+    return {
+        "status": "success", "imported": imported, "skipped": skipped,
+        "errors": errors[:10], "filename": file.filename,
+        "backup_path": backup_path, "backup_size": backup_size,
+        "column_mapping": {"compound": compound_col, "activity": activity_col,
+                           "activity_type": activity_type_col, "smiles": smiles_col},
+    }
+
+
+@router.post("/assay/rollback")
+def rollback_import(backup_path: str = ""):
+    """Restore database from backup."""
+    import shutil, os, glob
+    db_path = settings.db_path
+
+    if not backup_path:
+        # Find most recent backup
+        backups = sorted(glob.glob(db_path + ".backup.*"), reverse=True)
+        if not backups:
+            return {"status": "error", "message": "No backups found"}
+        backup_path = backups[0]
+
+    if not os.path.exists(backup_path):
+        return {"status": "error", "message": f"Backup not found: {backup_path}"}
+
+    try:
+        shutil.copy2(backup_path, db_path)
+        return {"status": "success", "restored_from": backup_path,
+                "size": os.path.getsize(db_path)}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@router.get("/assay/backups")
+def list_backups():
+    """List available database backups."""
+    import os, glob
+    db_path = settings.db_path
+    backups = sorted(glob.glob(db_path + ".backup.*"), reverse=True)
+    return [{"path": b, "size": os.path.getsize(b),
+             "created": b.split(".backup.")[-1]} for b in backups]
 
 
 @router.get("/recommend/next")
