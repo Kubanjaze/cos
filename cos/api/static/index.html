@@ -1132,12 +1132,13 @@ const ChEMBLFetcher = ({ target, onDone }) => {
     const [customTarget, setCustomTarget] = useState('');
     const fetch_data = async (name) => {
         setLoading(true); setResult(null);
-        const r = await api.post('/targets/fetch-chembl', null);
-        // Use query param approach
         const resp = await fetch(`/api/targets/fetch-chembl?target_name=${encodeURIComponent(name)}`, {method:'POST'});
         const data = await resp.json();
         setResult(data); setLoading(false);
-        if (data.status === 'success' && onDone) setTimeout(onDone, 500);
+        if (data.status === 'success' && onDone) {
+            // Reload the page after a brief pause to show the success message
+            setTimeout(() => { onDone(); }, 1500);
+        }
     };
     return (<div className="card" style={{borderLeft:'4px solid #fbbf24'}}>
         <h2>No compound data for {target}</h2>

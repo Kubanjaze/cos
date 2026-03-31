@@ -120,15 +120,26 @@ def target_profile(target_name: str):
         "confidence": concept[3] if concept else None,
     }
 
-    # Find investigation for this target — match title OR ID
-    inv_row = conn.execute("SELECT id FROM investigations WHERE LOWER(title) LIKE ? OR LOWER(id) LIKE ?",
-                           (f"%{target_name.lower()}%", f"%{target_name.lower()}%")).fetchone()
-    if not inv_row:
-        inv_row = conn.execute(
-            "SELECT DISTINCT investigation_id FROM entities WHERE investigation_id LIKE ? LIMIT 1",
-            (f"%{target_name.lower()}%",),
-        ).fetchone()
-    inv_id = inv_row[0] if inv_row else None
+    # Find investigation for this target — pick the one with the most compound data
+    inv_candidates = conn.execute(
+        "SELECT id FROM investigations WHERE LOWER(title) LIKE ? OR LOWER(id) LIKE ?",
+        (f"%{target_name.lower()}%", f"%{target_name.lower()}%"),
+    ).fetchall()
+    # Also check entities
+    ent_inv = conn.execute(
+        "SELECT DISTINCT investigation_id FROM entities WHERE investigation_id LIKE ?",
+        (f"%{target_name.lower()}%",),
+    ).fetchall()
+    all_inv_ids = list(set([r[0] for r in inv_candidates] + [r[0] for r in ent_inv]))
+
+    # Pick the investigation with the most compounds
+    inv_id = None
+    best_count = -1
+    for iid in all_inv_ids:
+        cnt = conn.execute("SELECT COUNT(*) FROM entities WHERE entity_type='compound' AND investigation_id=?", (iid,)).fetchone()[0]
+        if cnt > best_count:
+            best_count = cnt
+            inv_id = iid
 
     # Scaffolds scoped to this target's investigation
     if inv_id:
