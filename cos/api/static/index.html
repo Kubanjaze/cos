@@ -522,14 +522,19 @@ const Reasoning = () => {
     };
     useEffect(() => { reload(); }, []);
 
+    const [genResult, setGenResult] = useState(null);
+    const [extResult, setExtResult] = useState(null);
+
     const generateHyps = async () => {
-        setGenerating(true);
-        await api.post('/hypotheses/generate');
+        setGenerating(true); setGenResult(null);
+        const r = await api.post('/hypotheses/generate');
+        setGenResult(r);
         reload(); setGenerating(false);
     };
     const extractInsights = async () => {
-        setExtracting(true);
-        await api.post('/insights/extract');
+        setExtracting(true); setExtResult(null);
+        const r = await api.post('/insights/extract');
+        setExtResult(r);
         reload(); setExtracting(false);
     };
     const challengeHyp = async (id) => {
@@ -559,6 +564,20 @@ const Reasoning = () => {
                         {mpLoading?'Running...':'Run Full Analysis'}</button>
                 </div>
             </div>
+
+            {/* Action results */}
+            {genResult && <div className="card" style={{borderLeft:'4px solid #2563eb',padding:12}}>
+                <strong style={{color:'#38bdf8'}}>Generated {genResult.length} hypotheses</strong> from scaffold-activity patterns across all targets.
+                {genResult.length > 0 && <div style={{marginTop:6,fontSize:12,color:'#64748b'}}>
+                    Top: {genResult[0]?.statement?.substring(0,80)}... (confidence: {(genResult[0]?.confidence*100).toFixed(0)}%)
+                </div>}
+            </div>}
+            {extResult && <div className="card" style={{borderLeft:'4px solid #7c3aed',padding:12}}>
+                <strong style={{color:'#a78bfa'}}>Extracted {extResult.length} insights</strong> — activity outliers, knowledge gaps, and novel patterns.
+                {extResult.length > 0 && <div style={{marginTop:6,fontSize:12,color:'#64748b'}}>
+                    Top: {extResult[0]?.description?.substring(0,80)}... (novelty: {(extResult[0]?.novelty*100).toFixed(0)}%)
+                </div>}
+            </div>}
 
             {/* Multi-pass result */}
             {multipass && <div className="card" style={{borderLeft:'4px solid #059669'}}>
