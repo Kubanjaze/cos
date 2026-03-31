@@ -1417,12 +1417,23 @@ const Recommend = () => {
                         </div>
 
                         {/* Action buttons */}
-                        <div style={{display:'flex',gap:8}}>
-                            <button style={{padding:'6px 14px',background:'#064e3b',color:'#34d399',border:'1px solid #34d39955',borderRadius:6,cursor:'pointer',fontSize:12}}>
-                                ✓ Accept recommendation</button>
-                            <button style={{padding:'6px 14px',background:'#1e293b',color:'#64748b',border:'1px solid #334155',borderRadius:6,cursor:'pointer',fontSize:12}}>
+                        {!r._accepted && !r._skipped && <div style={{display:'flex',gap:8}}>
+                            <button onClick={(e)=>{e.stopPropagation();
+                                api.post('/decisions',{title:`Accept: ${r.strategy.replace(/_/g,' ')}`,recommendation:r.rationale,confidence:r.priority}).then(d=>{
+                                    r._accepted=true; r._decisionId=d.id; setRecs([...recs]);
+                                });
+                            }} style={{padding:'8px 16px',background:'#064e3b',color:'#34d399',border:'1px solid #34d39955',borderRadius:6,cursor:'pointer',fontSize:13}}>
+                                ✓ Accept — create decision</button>
+                            <button onClick={(e)=>{e.stopPropagation(); r._skipped=true; setRecs([...recs]);
+                            }} style={{padding:'8px 16px',background:'#1e293b',color:'#64748b',border:'1px solid #334155',borderRadius:6,cursor:'pointer',fontSize:13}}>
                                 ✗ Skip for now</button>
-                        </div>
+                        </div>}
+                        {r._accepted && <div style={{padding:10,background:'#064e3b',borderRadius:6,fontSize:13,color:'#34d399'}}>
+                            ✓ Accepted — decision created ({r._decisionId}). View in Decisions page.
+                        </div>}
+                        {r._skipped && <div style={{padding:10,background:'#1e293b',borderRadius:6,fontSize:13,color:'#64748b'}}>
+                            ✗ Skipped. You can revisit this later.
+                        </div>}
                     </div>}
                 </div>
                 );
