@@ -300,7 +300,20 @@ const Memory = () => {
 
 // ── Interactive Graph (force-directed, draggable, clickable) ──
 const SCAFFOLD_COLORS = { benz:'#4C72B0', naph:'#DD8452', ind:'#55A868', quin:'#C44E52', pyr:'#8172B2', bzim:'#937860' };
-const getNodeColor = (name) => { const p = name.split('_')[0]; return SCAFFOLD_COLORS[p] || '#38bdf8'; };
+// Auto-generate distinct colors for any scaffold name via hash
+const AUTO_COLORS = ['#4C72B0','#DD8452','#55A868','#C44E52','#8172B2','#937860','#DA8BC3','#8C8C8C','#CCB974','#64B5CD',
+    '#e6194b','#3cb44b','#ffe119','#4363d8','#f58231','#911eb4','#42d4f4','#f032e6','#bfef45','#fabed4',
+    '#469990','#dcbeff','#9A6324','#800000','#aaffc3','#808000','#ffd8b1','#000075','#a9a9a9','#e6beff'];
+const _colorCache = {};
+const getScaffoldColor = (name) => {
+    if (SCAFFOLD_COLORS[name]) return SCAFFOLD_COLORS[name];
+    if (_colorCache[name]) return _colorCache[name];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    _colorCache[name] = AUTO_COLORS[Math.abs(hash) % AUTO_COLORS.length];
+    return _colorCache[name];
+};
+const getNodeColor = (name) => { const p = name.split('_')[0]; return getScaffoldColor(p); };
 
 const GraphViz = ({ nodes, edges, center, onNodeClick }) => {
     const svgRef = React.useRef(null);
@@ -826,16 +839,16 @@ const SAR = () => {
             <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
                 {profiles.map(p => (
                     <div key={p.scaffold} style={{flex:'1 1 250px',background:'#0f172a',borderRadius:8,padding:14,
-                        border:'1px solid #334155',borderLeft:`4px solid ${SCAFFOLD_COLORS[p.scaffold]||'#38bdf8'}`}}>
+                        border:'1px solid #334155',borderLeft:`4px solid ${getScaffoldColor(p.scaffold)}`}}>
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                            <span style={{fontSize:20,fontWeight:700,color:SCAFFOLD_COLORS[p.scaffold]||'#38bdf8'}}>{p.scaffold}</span>
+                            <span style={{fontSize:20,fontWeight:700,color:getScaffoldColor(p.scaffold)}}>{p.scaffold}</span>
                             <span style={{fontSize:12,color:'#64748b'}}>{p.compound_count} compounds</span>
                         </div>
                         {p.avg_pIC50 && <div style={{marginTop:8}}>
                             <div style={{display:'flex',justifyContent:'space-between',fontSize:13}}>
                                 <span>Avg pIC50</span><strong style={{color:'#f1f5f9'}}>{p.avg_pIC50}</strong>
                             </div>
-                            <div className="conf-bar" style={{marginTop:4}}><div className="conf-bar-fill" style={{width:`${(p.avg_pIC50/10)*100}%`,background:SCAFFOLD_COLORS[p.scaffold]||'#38bdf8'}}/></div>
+                            <div className="conf-bar" style={{marginTop:4}}><div className="conf-bar-fill" style={{width:`${(p.avg_pIC50/10)*100}%`,background:getScaffoldColor(p.scaffold)}}/></div>
                             <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#64748b',marginTop:4}}>
                                 <span>Best: {p.best_pIC50}</span><span>Worst: {p.worst_pIC50}</span><span>Spread: {p.spread}</span>
                             </div>
@@ -887,7 +900,7 @@ const SAR = () => {
                     return (<div key={key} style={{flex:1,padding:14,background:'#0f172a',borderRadius:8,
                         border:`2px solid ${isWinner?'#34d399':'#334155'}`}}>
                         <div style={{display:'flex',justifyContent:'space-between'}}>
-                            <span style={{fontSize:18,fontWeight:700,color:SCAFFOLD_COLORS[s.scaffold]||'#38bdf8'}}>{s.scaffold}</span>
+                            <span style={{fontSize:18,fontWeight:700,color:getScaffoldColor(s.scaffold)}}>{s.scaffold}</span>
                             {isWinner && <span className="badge badge-ok">WINNER</span>}
                         </div>
                         <div style={{marginTop:8,fontSize:13}}>
@@ -909,7 +922,7 @@ const SAR = () => {
         <div className="card"><h2>All Compounds with Activity</h2>
             <table><thead><tr><th>Scaffold</th><th>Compound</th><th>pIC50</th><th>Activity Bar</th></tr></thead>
             <tbody>{heatmap.sort((a,b)=>b.pIC50-a.pIC50).map((d,i) => (
-                <tr key={i}><td><span style={{color:SCAFFOLD_COLORS[d.scaffold]||'#38bdf8'}}>{d.scaffold}</span></td>
+                <tr key={i}><td><span style={{color:getScaffoldColor(d.scaffold)}}>{d.scaffold}</span></td>
                 <td>{d.compound}</td><td><strong>{d.pIC50.toFixed(2)}</strong></td>
                 <td><div style={{width:200,height:8,background:'#1e293b',borderRadius:4,overflow:'hidden'}}>
                     <div style={{width:`${(d.pIC50/10)*100}%`,height:'100%',background:actColor(d.pIC50),borderRadius:4}}/></div></td></tr>
@@ -997,15 +1010,15 @@ const Compounds = () => {
             <div className="suggestion-chips" style={{marginBottom:12}}>
                 <div className={`chip ${!filter?'active':''}`} onClick={()=>setFilter('')} style={{background:!filter?'#2563eb':''}}>All ({compounds.length})</div>
                 {scaffolds.map(s => (
-                    <div key={s} className="chip" onClick={()=>setFilter(s)} style={{background:filter===s?(SCAFFOLD_COLORS[s]||'#2563eb')+'':'',
-                        borderColor:SCAFFOLD_COLORS[s]||'#334155'}}>{s} ({compounds.filter(c=>c.scaffold===s).length})</div>
+                    <div key={s} className="chip" onClick={()=>setFilter(s)} style={{background:filter===s?(getScaffoldColor(s))+'':'',
+                        borderColor:getScaffoldColor(s)+'55'}}>{s} ({compounds.filter(c=>c.scaffold===s).length})</div>
                 ))}
             </div>
             <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
                 {filtered.map(c => (
                     <div key={c.name} onClick={()=>api.get('/chem/compound/'+c.name).then(setDetail)}
                          style={{width:220,background:'#0f172a',borderRadius:8,padding:10,border:'1px solid #334155',
-                         borderTop:`3px solid ${SCAFFOLD_COLORS[c.scaffold]||'#38bdf8'}`,cursor:'pointer',transition:'transform 0.1s'}}
+                         borderTop:`3px solid ${getScaffoldColor(c.scaffold)}`,cursor:'pointer',transition:'transform 0.1s'}}
                          onMouseOver={e=>e.currentTarget.style.transform='scale(1.02)'} onMouseOut={e=>e.currentTarget.style.transform='scale(1)'}>
                         <MolSVG base64svg={c.svg_base64} width={200} height={140}/>
                         <div style={{fontSize:13,fontWeight:600,marginTop:6}}>{c.name}</div>
@@ -1023,7 +1036,7 @@ const Compounds = () => {
                 <div style={{flex:1}}>
                     <h3 style={{fontSize:18}}>{detail.name}</h3>
                     <div style={{fontSize:12,color:'#64748b',marginBottom:8}}>SMILES: {detail.smiles}</div>
-                    <div style={{fontSize:14,marginBottom:4}}>Scaffold: <strong style={{color:SCAFFOLD_COLORS[detail.scaffold]||'#38bdf8'}}>{detail.scaffold}</strong></div>
+                    <div style={{fontSize:14,marginBottom:4}}>Scaffold: <strong style={{color:getScaffoldColor(detail.scaffold)}}>{detail.scaffold}</strong></div>
                     {detail.pic50 && <div style={{fontSize:14}}>pIC50: <strong>{detail.pic50}</strong></div>}
                     {detail.properties && <div style={{marginTop:12}}>
                         <h2>Molecular Properties</h2>
@@ -1071,7 +1084,7 @@ const Similarity = () => {
             <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
                 {results.map((r,i) => (
                     <div key={r.name} style={{width:200,background:'#0f172a',borderRadius:8,padding:10,
-                        border:`1px solid ${i===0?'#38bdf8':'#334155'}`,borderTop:`3px solid ${SCAFFOLD_COLORS[r.scaffold]||'#38bdf8'}`}}>
+                        border:`1px solid ${i===0?'#38bdf8':'#334155'}`,borderTop:`3px solid ${getScaffoldColor(r.scaffold)}`}}>
                         <MolSVG base64svg={r.svg_base64} width={180} height={130}/>
                         <div style={{fontSize:13,fontWeight:600,marginTop:4}}>{r.name}</div>
                         <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#64748b',marginTop:2}}>
@@ -1227,8 +1240,8 @@ const TargetProfile = () => {
             <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
                 {profile.scaffolds.map(s => (
                     <div key={s.name} style={{flex:'1 1 200px',background:'#0f172a',borderRadius:8,padding:12,
-                        borderLeft:`4px solid ${SCAFFOLD_COLORS[s.name]||'#38bdf8'}`}}>
-                        <div style={{fontSize:18,fontWeight:700,color:SCAFFOLD_COLORS[s.name]||'#38bdf8'}}>{s.name}</div>
+                        borderLeft:`4px solid ${getScaffoldColor(s.name)}`}}>
+                        <div style={{fontSize:18,fontWeight:700,color:getScaffoldColor(s.name)}}>{s.name}</div>
                         <div style={{fontSize:12,color:'#64748b'}}>{s.compounds} compounds</div>
                         <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginTop:6}}>
                             <span>Avg pIC50</span><strong>{s.avg_pIC50}</strong>
@@ -1328,8 +1341,8 @@ const Recommend = () => {
                      style={{background:!focusScaffold?'#2563eb':''}}>All strategies</div>
                 {scaffolds.map(s => (
                     <div key={s.scaffold} className="chip" onClick={()=>setFocusScaffold(s.scaffold)}
-                         style={{background:focusScaffold===s.scaffold?(SCAFFOLD_COLORS[s.scaffold]||'#2563eb'):'',
-                         borderColor:SCAFFOLD_COLORS[s.scaffold]||'#334155'}}>
+                         style={{background:focusScaffold===s.scaffold?(getScaffoldColor(s.scaffold)):'',
+                         borderColor:getScaffoldColor(s.scaffold)+'55'}}>
                         {s.scaffold} (avg {s.avg_pIC50})
                     </div>
                 ))}
@@ -1347,7 +1360,7 @@ const Recommend = () => {
                 const isAiLoading = aiLoading[r.strategy];
 
                 return (
-                <div key={i} className="card" style={{borderLeft:`4px solid ${SCAFFOLD_COLORS[scaff]||'#38bdf8'}`,cursor:'pointer'}}
+                <div key={i} className="card" style={{borderLeft:`4px solid ${getScaffoldColor(scaff)}`,cursor:'pointer'}}
                      onClick={()=>toggleExpand(i, r)}>
                     {/* Header */}
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
@@ -1368,7 +1381,7 @@ const Recommend = () => {
                     {/* Scaffold tag */}
                     {scaff && <div style={{marginTop:8}}>
                         <span style={{padding:'3px 10px',borderRadius:4,fontSize:12,fontWeight:600,
-                            background:(SCAFFOLD_COLORS[scaff]||'#38bdf8')+'33',color:SCAFFOLD_COLORS[scaff]||'#38bdf8'}}>
+                            background:(getScaffoldColor(scaff))+'33',color:getScaffoldColor(scaff)}}>
                             {scaff}
                         </span>
                     </div>}
