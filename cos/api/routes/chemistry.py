@@ -34,12 +34,29 @@ def get_compounds(scaffold: Optional[str] = None, investigation: Optional[str] =
     rows = conn.execute(query, params).fetchall()
     conn.close()
 
+    # Load CETP SMILES lookup from CSV (for compounds where DB value is just a name)
+    cetp_smiles = {}
+    try:
+        import csv
+        with open("C:/Users/Kerwyn/PycharmProjects/mms-extractor/data/compounds.csv") as f:
+            for row in csv.DictReader(f):
+                cetp_smiles[row.get("compound_name", "")] = row.get("smiles", "")
+    except Exception:
+        pass
+
     compounds = []
     seen = set()
-    for name, smiles, inv_id, activity, scaf in rows:
+    for name, value, inv_id, activity, scaf in rows:
         if name in seen:
             continue
         seen.add(name)
+
+        # Determine SMILES: use DB value if it looks like SMILES, else look up from CSV
+        smiles = ""
+        if value and any(c in value for c in ["(", "=", "#", "c1", "C1", "/"]):
+            smiles = value
+        elif name in cetp_smiles:
+            smiles = cetp_smiles[name]
 
         pic50 = None
         if activity and "pIC50=" in activity:
@@ -49,11 +66,11 @@ def get_compounds(scaffold: Optional[str] = None, investigation: Optional[str] =
                 pass
 
         svg = ""
-        if smiles and len(smiles) > 5 and "c" in smiles.lower():
+        if smiles and len(smiles) > 5:
             svg = render_svg_base64(smiles, 200, 150)
 
         entry = {
-            "name": name, "smiles": smiles or "", "pic50": pic50,
+            "name": name, "smiles": smiles, "pic50": pic50,
             "scaffold": scaf or "unknown", "svg_base64": svg,
             "investigation_id": inv_id,
         }
