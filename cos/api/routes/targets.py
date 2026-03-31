@@ -314,6 +314,9 @@ async def import_assay_data(file: UploadFile = File(...), investigation_id: str 
                 if len(errors) > 20:
                     break
 
+        # Auto-assign Murcko scaffolds from SMILES
+        scaffold_count = _assign_murcko_scaffolds(conn, investigation_id)
+
         conn.commit()
     except Exception as e:
         conn.close()
@@ -327,7 +330,7 @@ async def import_assay_data(file: UploadFile = File(...), investigation_id: str 
 
     conn.close()
     return {
-        "status": "success", "imported": imported, "skipped": skipped,
+        "status": "success", "imported": imported, "skipped": skipped, "scaffolds_assigned": scaffold_count,
         "errors": errors[:10], "filename": file.filename,
         "backup_path": backup_path, "backup_size": backup_size,
         "column_mapping": {"compound": compound_col, "activity": activity_col,

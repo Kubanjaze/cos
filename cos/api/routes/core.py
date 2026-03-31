@@ -104,12 +104,26 @@ def provenance_stats():
 
 @router.post("/ingest/path")
 def ingest_by_path(file_path: str = "", investigation_id: str = "default"):
-    """Ingest a local file by path."""
+    """Ingest a local file by path. Auto-assigns Murcko scaffolds if compounds have SMILES."""
     from cos.core.ingestion import ingest_file
     try:
         artifact = ingest_file(file_path, investigation_id=investigation_id)
+
+        # Auto-assign scaffolds for any new compounds
+        try:
+            from cos.api.routes.targets import _assign_murcko_scaffolds
+            import sqlite3
+            from cos.core.config import settings
+            conn = sqlite3.connect(settings.db_path)
+            scaffolds = _assign_murcko_scaffolds(conn, investigation_id)
+            conn.commit()
+            conn.close()
+        except Exception:
+            scaffolds = 0
+
         return {"status": "success", "id": artifact.id, "uri": artifact.uri,
-                "type": artifact.type, "size": artifact.size_bytes, "hash": artifact.hash[:16]}
+                "type": artifact.type, "size": artifact.size_bytes, "hash": artifact.hash[:16],
+                "scaffolds_assigned": scaffolds}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
