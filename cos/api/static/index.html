@@ -1211,34 +1211,146 @@ const TargetProfile = () => {
     </div>);
 };
 
-// ── Recommender Page ────────────────────────────────
+// ── Recommender Page (interactive) ──────────────────
 const Recommend = () => {
     const [recs, setRecs] = useState([]);
     const [loading, setLoading] = useState(true);
-    useEffect(() => { api.get('/recommend/next').then(d => { setRecs(d); setLoading(false); }); }, []);
+    const [expanded, setExpanded] = useState(null);
+    const [compoundData, setCompoundData] = useState({});
+    const [aiInsight, setAiInsight] = useState({});
+    const [aiLoading, setAiLoading] = useState({});
+    const [focusScaffold, setFocusScaffold] = useState('');
+    const [scaffolds, setScaffolds] = useState([]);
+
+    useEffect(() => {
+        api.get('/recommend/next').then(d => { setRecs(d); setLoading(false); });
+        api.get('/sar/scaffolds').then(setScaffolds);
+    }, []);
+
+    const loadCompounds = (scaffold) => {
+        if (compoundData[scaffold]) return;
+        api.get(`/chem/compounds?scaffold=${scaffold}`).then(d => {
+            setCompoundData(prev => ({...prev, [scaffold]: d}));
+        });
+    };
+
+    const askAI = async (strategy, rationale) => {
+        setAiLoading(prev => ({...prev, [strategy]: true}));
+        const q = `Based on this recommendation: "${rationale}" — What specific structural modifications should we try? Be specific about R-groups and substitution patterns.`;
+        const r = await api.get(`/llm/ask?q=${encodeURIComponent(q)}`);
+        setAiInsight(prev => ({...prev, [strategy]: r}));
+        setAiLoading(prev => ({...prev, [strategy]: false}));
+    };
+
+    const toggleExpand = (i, rec) => {
+        if (expanded === i) { setExpanded(null); return; }
+        setExpanded(i);
+        if (rec.scaffold) loadCompounds(rec.scaffold);
+        if (rec.scaffolds) rec.scaffolds.forEach(s => loadCompounds(s));
+    };
+
     const effortColor = {low:'#34d399',medium:'#fbbf24',high:'#f87171'};
+    const effortIcon = {low:'⚡',medium:'🔧',high:'🏗️'};
+
+    const filtered = focusScaffold ? recs.filter(r => r.scaffold === focusScaffold || (r.scaffolds && r.scaffolds.includes(focusScaffold))) : recs;
+
     return (<div>
         <div className="page-title">What to Make Next</div>
-        {loading ? <div className="loading">Analyzing SAR data...</div> :
+
+        {/* Scaffold focus filter */}
+        <div className="card">
+            <h2>Focus Scaffold</h2>
+            <div className="suggestion-chips">
+                <div className={`chip ${!focusScaffold?'active':''}`} onClick={()=>setFocusScaffold('')}
+                     style={{background:!focusScaffold?'#2563eb':''}}>All strategies</div>
+                {scaffolds.map(s => (
+                    <div key={s.scaffold} className="chip" onClick={()=>setFocusScaffold(s.scaffold)}
+                         style={{background:focusScaffold===s.scaffold?(SCAFFOLD_COLORS[s.scaffold]||'#2563eb'):'',
+                         borderColor:SCAFFOLD_COLORS[s.scaffold]||'#334155'}}>
+                        {s.scaffold} (avg {s.avg_pIC50})
+                    </div>
+                ))}
+            </div>
+        </div>
+
+        {loading ? <div className="loading">Analyzing SAR data for recommendations...</div> :
         <div>
-            {recs.map((r,i) => (
-                <div key={i} className="card" style={{borderLeft:`4px solid ${i===0?'#34d399':'#334155'}`}}>
+            {filtered.length === 0 && <div className="card"><div style={{color:'#64748b'}}>No recommendations for this scaffold. Try "All strategies".</div></div>}
+            {filtered.map((r,i) => {
+                const isOpen = expanded === i;
+                const scaff = r.scaffold || (r.scaffolds && r.scaffolds[0]) || '';
+                const compounds = scaff ? (compoundData[scaff] || []) : [];
+                const insight = aiInsight[r.strategy];
+                const isAiLoading = aiLoading[r.strategy];
+
+                return (
+                <div key={i} className="card" style={{borderLeft:`4px solid ${SCAFFOLD_COLORS[scaff]||'#38bdf8'}`,cursor:'pointer'}}
+                     onClick={()=>toggleExpand(i, r)}>
+                    {/* Header */}
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
                         <div>
-                            <span style={{fontSize:18,fontWeight:700,color:'#f1f5f9'}}>#{i+1} </span>
-                            <span style={{fontSize:15,fontWeight:600,color:'#38bdf8'}}>{r.strategy.replace(/_/g,' ')}</span>
+                            <span style={{fontSize:20,marginRight:8}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':'📋'}</span>
+                            <span style={{fontSize:16,fontWeight:700,color:'#f1f5f9'}}>{r.strategy.replace(/_/g,' ')}</span>
                         </div>
                         <div style={{display:'flex',gap:6}}>
                             <span className="badge badge-info">Priority: {(r.priority*100).toFixed(0)}%</span>
-                            <span className="badge" style={{background:effortColor[r.effort]+'33',color:effortColor[r.effort]}}>Effort: {r.effort}</span>
+                            <span className="badge" style={{background:effortColor[r.effort]+'33',color:effortColor[r.effort]}}>{effortIcon[r.effort]} {r.effort}</span>
+                            <span style={{color:'#475569',fontSize:18}}>{isOpen?'▼':'▶'}</span>
                         </div>
                     </div>
-                    <div style={{fontSize:14,lineHeight:1.6}}>{r.rationale}</div>
-                    {r.scaffold && <div style={{marginTop:8,fontSize:13,color:'#64748b'}}>Scaffold: <strong style={{color:SCAFFOLD_COLORS[r.scaffold]||'#38bdf8'}}>{r.scaffold}</strong></div>}
-                    {r.compounds && <div style={{marginTop:6,fontSize:13,color:'#64748b'}}>Compounds: {r.compounds.join(', ')}</div>}
-                    {r.scaffolds && <div style={{marginTop:6,fontSize:13,color:'#64748b'}}>Scaffolds: {r.scaffolds.join(' + ')}</div>}
+
+                    {/* Rationale */}
+                    <div style={{fontSize:14,lineHeight:1.6,color:'#e2e8f0'}}>{r.rationale}</div>
+
+                    {/* Scaffold tag */}
+                    {scaff && <div style={{marginTop:8}}>
+                        <span style={{padding:'3px 10px',borderRadius:4,fontSize:12,fontWeight:600,
+                            background:(SCAFFOLD_COLORS[scaff]||'#38bdf8')+'33',color:SCAFFOLD_COLORS[scaff]||'#38bdf8'}}>
+                            {scaff}
+                        </span>
+                    </div>}
+
+                    {/* Expanded section */}
+                    {isOpen && <div style={{marginTop:16,borderTop:'1px solid #334155',paddingTop:12}} onClick={e=>e.stopPropagation()}>
+
+                        {/* Compounds in this scaffold */}
+                        {compounds.length > 0 && <div style={{marginBottom:16}}>
+                            <h2>Compounds in {scaff}</h2>
+                            <div style={{display:'flex',flexWrap:'wrap',gap:8,marginTop:8}}>
+                                {compounds.slice(0,6).map(c => (
+                                    <div key={c.name} style={{width:160,background:'#0f172a',borderRadius:6,padding:8,border:'1px solid #334155'}}>
+                                        <MolSVG base64svg={c.svg_base64} width={150} height={100}/>
+                                        <div style={{fontSize:11,fontWeight:600,marginTop:4}}>{c.name}</div>
+                                        {c.pic50 && <div style={{fontSize:11,color:c.pic50>7.5?'#34d399':c.pic50>6.5?'#fbbf24':'#f87171'}}>pIC50={c.pic50}</div>}
+                                    </div>
+                                ))}
+                                {compounds.length > 6 && <div style={{alignSelf:'center',color:'#64748b',fontSize:12}}>+{compounds.length-6} more</div>}
+                            </div>
+                        </div>}
+
+                        {/* AI analysis button */}
+                        <div style={{marginBottom:12}}>
+                            {!insight && <button onClick={(e)=>{e.stopPropagation();askAI(r.strategy,r.rationale)}} disabled={isAiLoading}
+                                style={{padding:'8px 16px',background:'#7c3aed',color:'white',border:'none',borderRadius:6,cursor:'pointer',fontSize:13}}>
+                                {isAiLoading ? 'Analyzing...' : '🧠 Ask AI for specific modifications'}
+                            </button>}
+                            {insight && <div style={{background:'#1e1338',borderRadius:8,padding:12,border:'1px solid #7c3aed55'}}>
+                                <div style={{fontSize:11,color:'#a78bfa',marginBottom:6}}>AI Analysis {insight.cached?'(cached — free)':insight.cost_usd?`($${insight.cost_usd.toFixed(4)})`:''}</div>
+                                <div style={{fontSize:13,lineHeight:1.6,whiteSpace:'pre-wrap'}}>{insight.answer}</div>
+                            </div>}
+                        </div>
+
+                        {/* Action buttons */}
+                        <div style={{display:'flex',gap:8}}>
+                            <button style={{padding:'6px 14px',background:'#064e3b',color:'#34d399',border:'1px solid #34d39955',borderRadius:6,cursor:'pointer',fontSize:12}}>
+                                ✓ Accept recommendation</button>
+                            <button style={{padding:'6px 14px',background:'#1e293b',color:'#64748b',border:'1px solid #334155',borderRadius:6,cursor:'pointer',fontSize:12}}>
+                                ✗ Skip for now</button>
+                        </div>
+                    </div>}
                 </div>
-            ))}
+                );
+            })}
         </div>}
     </div>);
 };
