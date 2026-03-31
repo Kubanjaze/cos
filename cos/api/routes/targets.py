@@ -15,44 +15,61 @@ router = APIRouter()
 
 @router.get("/targets")
 def list_targets():
-    """List all known targets — from entities + concepts + known target names."""
+    """Discover targets from data: entities typed 'target', investigations, and
+    any concept that has compound activity data linked to it."""
     conn = sqlite3.connect(settings.db_path)
-    target_names = set()
+    targets = []
 
-    # From target entities
+    # Source 1: Entities explicitly typed as 'target'
     rows = conn.execute("SELECT DISTINCT name FROM entities WHERE entity_type='target'").fetchall()
+    seen = set()
     for (name,) in rows:
-        target_names.add(name)
+        seen.add(name.upper())
 
-    # From concepts explicitly categorized as targets
+    # Source 2: Investigations — each investigation represents a target program
+    rows = conn.execute("SELECT id, title, domain FROM investigations").fetchall()
+    for inv_id, title, domain in rows:
+        # Extract likely target name from title (first word or known pattern)
+        for word in title.replace("-", " ").split():
+            if len(word) >= 3 and word.upper() == word and word.upper() not in seen:
+                seen.add(word.upper())
+
+    # Source 3: Concepts that look like biological targets (not methods/metrics/AI)
     rows = conn.execute(
-        "SELECT DISTINCT name FROM concepts WHERE category='target'"
+        "SELECT name, definition, domain, confidence FROM concepts "
+        "WHERE category NOT IN ('method','metric','recommendation') "
+        "AND domain NOT IN ('ai_analysis') "
+        "ORDER BY confidence DESC"
     ).fetchall()
-    for (name,) in rows:
-        target_names.add(name)
+    for name, defn, domain, conf in rows:
+        if name.upper() not in seen:
+            seen.add(name.upper())
 
-    # Fallback: if still empty, add CETP as default (we know it's the project target)
-    if not target_names:
-        target_names.add("CETP")
+    # Source 4: If we have activity data but found nothing, infer a target exists
+    if not seen:
+        has_activity = conn.execute("SELECT COUNT(*) FROM entity_relations WHERE relation_type='has_activity'").fetchone()[0]
+        if has_activity > 0:
+            seen.add("UNKNOWN_TARGET")
 
-    compound_count = conn.execute(
-        "SELECT COUNT(DISTINCT name) FROM entities WHERE entity_type='compound'"
-    ).fetchone()[0]
+    # Build target profiles
+    compound_count = conn.execute("SELECT COUNT(DISTINCT name) FROM entities WHERE entity_type='compound'").fetchone()[0]
+    scaffold_count = conn.execute("SELECT COUNT(DISTINCT target_value) FROM entity_relations WHERE relation_type='belongs_to_scaffold'").fetchone()[0]
+    activity_count = conn.execute("SELECT COUNT(*) FROM entity_relations WHERE relation_type='has_activity'").fetchone()[0]
 
-    result = []
-    for name in sorted(target_names):
+    for name in sorted(seen):
         concept = conn.execute(
-            "SELECT definition, confidence FROM concepts WHERE name_lower=? ORDER BY confidence DESC LIMIT 1",
-            (name.lower(),),
+            "SELECT definition, confidence FROM concepts WHERE UPPER(name)=? ORDER BY confidence DESC LIMIT 1",
+            (name,),
         ).fetchone()
-        result.append({
-            "name": name, "compounds": compound_count,
+        targets.append({
+            "name": name, "compounds": compound_count, "scaffolds": scaffold_count,
+            "activities": activity_count,
             "definition": concept[0] if concept else None,
             "confidence": concept[1] if concept else None,
         })
 
     conn.close()
-    return result
+    return targets
 
 
 @router.get("/targets/{target_name}")
