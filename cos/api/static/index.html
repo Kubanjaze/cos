@@ -568,26 +568,118 @@ const Reasoning = () => {
     );
 };
 
-// ── Decisions Page ────────────────────────────────────
+// ── Decisions Page (interactive) ──────────────────────
 const Decisions = () => {
     const [decs, setDecs] = useState([]);
-    const [actions, setActions] = useState([]);
-    useEffect(() => {
-        api.get('/decisions').then(setDecs);
-        api.get('/decisions/board/view').then(setActions);
-    }, []);
+    const [expanded, setExpanded] = useState(null);
+    const [detail, setDetail] = useState(null);
+    const [risks, setRisks] = useState(null);
+    const [tradeoffs, setTradeoffs] = useState(null);
+    const [missing, setMissing] = useState(null);
+    const reload = () => api.get('/decisions').then(setDecs);
+    useEffect(() => { reload(); }, []);
+
+    const expand = (dec) => {
+        if (expanded === dec.id) { setExpanded(null); return; }
+        setExpanded(dec.id);
+        setDetail(null); setRisks(null); setTradeoffs(null); setMissing(null);
+        api.get(`/decisions/${dec.id}`).then(setDetail);
+    };
+
+    const assessRisk = (id) => api.get(`/decisions/${id}/risks`).then(setRisks);
+    const analyzeTradeoffs = (id) => api.get(`/decisions/${id}/tradeoffs`).then(setTradeoffs);
+    const findMissing = (id) => api.get(`/decisions/${id}/missing`).then(setMissing);
+
     return (
         <div>
-            <div className="page-title">Decisions</div>
-            <div className="card"><h2>Decision Board</h2>
-                <table><thead><tr><th>Title</th><th>Confidence</th><th>Status</th><th>Actions</th><th>Risks</th></tr></thead>
-                <tbody>{decs.map(d => (
-                    <tr key={d.id}><td>{d.title}</td>
-                    <td><ConfBar value={d.confidence}/> {(d.confidence*100).toFixed(0)}%</td>
-                    <td><span className="badge badge-info">{d.status}</span></td>
-                    <td>{d.actions}</td><td>{d.risks}</td></tr>
-                ))}</tbody></table>
-            </div>
+            <div className="page-title">Decisions ({decs.length})</div>
+            {decs.length === 0 ? <div className="card"><div className="loading">No decisions yet. Accept a recommendation from "What to Make" or run an autonomous investigation.</div></div> :
+            decs.map(d => (
+                <div key={d.id} className="card" style={{cursor:'pointer',borderLeft:`4px solid ${d.confidence>0.7?'#34d399':d.confidence>0.5?'#fbbf24':'#f87171'}`}}
+                     onClick={()=>expand(d)}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                        <div>
+                            <span style={{fontSize:16,fontWeight:600}}>{d.title}</span>
+                            <div style={{fontSize:12,color:'#64748b',marginTop:2}}>{d.recommendation?.substring(0,80)}</div>
+                        </div>
+                        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                            <span style={{fontSize:22,fontWeight:700,color:d.confidence>0.7?'#34d399':d.confidence>0.5?'#fbbf24':'#f87171'}}>
+                                {(d.confidence*100).toFixed(0)}%</span>
+                            <span className={`badge ${d.status==='proposed'?'badge-info':'badge-ok'}`}>{d.status}</span>
+                            <span style={{color:'#475569'}}>{expanded===d.id?'▼':'▶'}</span>
+                        </div>
+                    </div>
+
+                    {expanded === d.id && <div style={{marginTop:12,borderTop:'1px solid #334155',paddingTop:12}} onClick={e=>e.stopPropagation()}>
+                        {/* Action buttons */}
+                        <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+                            <button onClick={()=>assessRisk(d.id)}
+                                style={{padding:'6px 14px',background:'#7f1d1d',color:'#f87171',border:'1px solid #f8717133',borderRadius:6,cursor:'pointer',fontSize:12}}>
+                                Assess Risks</button>
+                            <button onClick={()=>analyzeTradeoffs(d.id)}
+                                style={{padding:'6px 14px',background:'#78350f',color:'#fbbf24',border:'1px solid #fbbf2433',borderRadius:6,cursor:'pointer',fontSize:12}}>
+                                Analyze Tradeoffs</button>
+                            <button onClick={()=>findMissing(d.id)}
+                                style={{padding:'6px 14px',background:'#1e3a5f',color:'#38bdf8',border:'1px solid #38bdf833',borderRadius:6,cursor:'pointer',fontSize:12}}>
+                                Find Missing Evidence</button>
+                        </div>
+
+                        {/* Detail */}
+                        {detail && detail.id === d.id && <div style={{marginBottom:12}}>
+                            <div style={{fontSize:13,lineHeight:1.6}}><strong>Recommendation:</strong> {detail.recommendation}</div>
+                            {detail.invalidation_conditions?.length > 0 && <div style={{marginTop:8,fontSize:12,color:'#f87171'}}>
+                                <strong>Invalidation conditions:</strong> {detail.invalidation_conditions.join('; ')}
+                            </div>}
+                        </div>}
+
+                        {/* Risks */}
+                        {risks && <div style={{marginBottom:12}}>
+                            <h3 style={{color:'#f87171',marginBottom:8}}>Risk Assessment ({risks.length})</h3>
+                            {risks.map((r,i) => (
+                                <div key={i} style={{background:'#0f172a',padding:10,borderRadius:6,marginBottom:6,borderLeft:'3px solid #f87171'}}>
+                                    <div style={{display:'flex',justifyContent:'space-between'}}>
+                                        <span className="badge badge-high">{r.type?.replace(/_/g,' ')}</span>
+                                        <span style={{fontSize:12,color:'#64748b'}}>Impact: {r.impact}</span>
+                                    </div>
+                                    <div style={{fontSize:13,marginTop:4}}>{r.description}</div>
+                                    {r.mitigation && <div style={{fontSize:12,color:'#34d399',marginTop:4}}>Mitigation: {r.mitigation}</div>}
+                                </div>
+                            ))}
+                        </div>}
+
+                        {/* Tradeoffs */}
+                        {tradeoffs && !tradeoffs.error && <div style={{marginBottom:12}}>
+                            <h3 style={{color:'#fbbf24',marginBottom:8}}>Tradeoff Analysis</h3>
+                            <div style={{display:'flex',gap:16}}>
+                                <div style={{flex:1}}>
+                                    <div style={{fontSize:12,color:'#34d399',marginBottom:4}}>Pros</div>
+                                    {tradeoffs.pros?.map((p,i) => <div key={i} style={{fontSize:13,padding:4}}>+ {p}</div>)}
+                                </div>
+                                <div style={{flex:1}}>
+                                    <div style={{fontSize:12,color:'#f87171',marginBottom:4}}>Cons</div>
+                                    {tradeoffs.cons?.map((c,i) => <div key={i} style={{fontSize:13,padding:4}}>- {c}</div>)}
+                                </div>
+                            </div>
+                            <div style={{marginTop:8,fontSize:14}}>
+                                Confidence: {tradeoffs.original_confidence?.toFixed(2)} → <strong>{tradeoffs.adjusted_confidence?.toFixed(2)}</strong>
+                                {' — '}<span style={{color:tradeoffs.recommendation==='Proceed'?'#34d399':'#fbbf24'}}>{tradeoffs.recommendation}</span>
+                            </div>
+                        </div>}
+
+                        {/* Missing evidence */}
+                        {missing && <div style={{marginBottom:12}}>
+                            <h3 style={{color:'#38bdf8',marginBottom:8}}>Missing Evidence ({missing.length})</h3>
+                            {missing.map((m,i) => (
+                                <div key={i} style={{background:'#0f172a',padding:10,borderRadius:6,marginBottom:6,borderLeft:'3px solid #38bdf8'}}>
+                                    <span className={`badge ${m.severity==='high'?'badge-high':m.severity==='medium'?'badge-warn':'badge-info'}`}>{m.severity}</span>
+                                    <div style={{fontSize:13,marginTop:4}}>{m.description}</div>
+                                    <div style={{fontSize:12,color:'#38bdf8',marginTop:2}}>→ {m.suggestion}</div>
+                                </div>
+                            ))}
+                        </div>}
+                    </div>}
+                </div>
+            ))}
         </div>
     );
 };
@@ -1297,6 +1389,8 @@ const Recommend = () => {
     const [aiLoading, setAiLoading] = useState({});
     const [focusScaffold, setFocusScaffold] = useState('');
     const [scaffolds, setScaffolds] = useState([]);
+    const [accepted, setAccepted] = useState({});
+    const [skipped, setSkipped] = useState({});
 
     useEffect(() => {
         api.get('/recommend/next').then(d => { setRecs(d); setLoading(false); });
@@ -1417,21 +1511,23 @@ const Recommend = () => {
                         </div>
 
                         {/* Action buttons */}
-                        {!r._accepted && !r._skipped && <div style={{display:'flex',gap:8}}>
+                        {!accepted[r.strategy] && !skipped[r.strategy] && <div style={{display:'flex',gap:8}}>
                             <button onClick={(e)=>{e.stopPropagation();
                                 api.post('/decisions',{title:`Accept: ${r.strategy.replace(/_/g,' ')}`,recommendation:r.rationale,confidence:r.priority}).then(d=>{
-                                    r._accepted=true; r._decisionId=d.id; setRecs([...recs]);
+                                    setAccepted(prev=>({...prev,[r.strategy]:d.id}));
                                 });
                             }} style={{padding:'8px 16px',background:'#064e3b',color:'#34d399',border:'1px solid #34d39955',borderRadius:6,cursor:'pointer',fontSize:13}}>
                                 ✓ Accept — create decision</button>
-                            <button onClick={(e)=>{e.stopPropagation(); r._skipped=true; setRecs([...recs]);
+                            <button onClick={(e)=>{e.stopPropagation();
+                                setSkipped(prev=>({...prev,[r.strategy]:true}));
                             }} style={{padding:'8px 16px',background:'#1e293b',color:'#64748b',border:'1px solid #334155',borderRadius:6,cursor:'pointer',fontSize:13}}>
                                 ✗ Skip for now</button>
                         </div>}
-                        {r._accepted && <div style={{padding:10,background:'#064e3b',borderRadius:6,fontSize:13,color:'#34d399'}}>
-                            ✓ Accepted — decision created ({r._decisionId}). View in Decisions page.
+                        {accepted[r.strategy] && <div onClick={(e)=>{e.stopPropagation(); /* navigate handled by parent */}}
+                            style={{padding:10,background:'#064e3b',borderRadius:6,fontSize:13,color:'#34d399',cursor:'default'}}>
+                            ✓ Accepted — decision created ({accepted[r.strategy]})
                         </div>}
-                        {r._skipped && <div style={{padding:10,background:'#1e293b',borderRadius:6,fontSize:13,color:'#64748b'}}>
+                        {skipped[r.strategy] && <div style={{padding:10,background:'#1e293b',borderRadius:6,fontSize:13,color:'#64748b'}}>
                             ✗ Skipped. You can revisit this later.
                         </div>}
                     </div>}
