@@ -441,11 +441,65 @@ def fetch_and_ingest_from_chembl(target_name: str = "", investigation_id: str = 
 
         ingested += 1
 
+    # Step 5: Assign Murcko scaffold families from structures
+    scaffold_count = _assign_murcko_scaffolds(conn, inv_id)
+
     conn.commit()
     conn.close()
 
     return {"status": "success", "target": target_name, "investigation_id": inv_id,
-            "fetched": len(compounds), "ingested": ingested}
+            "fetched": len(compounds), "ingested": ingested, "scaffolds_assigned": scaffold_count}
+
+
+def _assign_murcko_scaffolds(conn, investigation_id: str) -> int:
+    """Compute Murcko scaffolds from SMILES and create belongs_to_scaffold relations."""
+    try:
+        from rdkit import Chem
+        from rdkit.Chem.Scaffolds import MurckoScaffold
+    except ImportError:
+        return 0
+
+    ts = time.strftime("%Y-%m-%dT%H:%M:%S")
+
+    # Get compounds with SMILES that don't have scaffold relations yet
+    rows = conn.execute("""
+        SELECT e.name, e.value FROM entities e
+        LEFT JOIN entity_relations r ON e.name = r.source_entity AND r.relation_type='belongs_to_scaffold'
+        WHERE e.entity_type='compound' AND e.investigation_id=? AND r.id IS NULL
+        AND e.value LIKE '%c%'
+    """, (investigation_id,)).fetchall()
+
+    # Group by Murcko scaffold
+    scaffold_map = {}
+    for name, smiles in rows:
+        try:
+            mol = Chem.MolFromSmiles(smiles)
+            if not mol:
+                continue
+            core = MurckoScaffold.GetScaffoldForMol(mol)
+            generic = MurckoScaffold.MakeScaffoldGeneric(core)
+            scaffold_smiles = Chem.MolToSmiles(generic)
+            scaffold_map.setdefault(scaffold_smiles, []).append(name)
+        except Exception:
+            continue
+
+    # Name scaffolds by frequency (Scaffold_A, Scaffold_B, ...)
+    sorted_scaffolds = sorted(scaffold_map.items(), key=lambda x: -len(x[1]))
+    assigned = 0
+
+    for i, (smi, compounds) in enumerate(sorted_scaffolds):
+        scaffold_name = f"Scaffold_{chr(65 + i)}" if i < 26 else f"Scaffold_{i+1}"
+
+        for compound_name in compounds:
+            rel_id = f"rel-{uuid.uuid4().hex[:8]}"
+            conn.execute(
+                "INSERT OR IGNORE INTO entity_relations (id, source_entity, relation_type, target_value, confidence, source_chunk_id, document_id, created_at) "
+                "VALUES (?, ?, 'belongs_to_scaffold', ?, 1.0, NULL, ?, ?)",
+                (rel_id, compound_name, scaffold_name, f"chembl-{investigation_id}", ts),
+            )
+            assigned += 1
+
+    return assigned
 
 
 @router.get("/recommend/next")
