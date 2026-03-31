@@ -89,6 +89,10 @@ const Sidebar = ({ page, setPage }) => (
         <div className="section">Execution</div>
         <a className={page==='workflows'?'active':''} onClick={()=>setPage('workflows')}>Workflows</a>
         <a className={page==='autonomous'?'active':''} onClick={()=>setPage('autonomous')}>Autonomous</a>
+        <div className="section">Chemistry</div>
+        <a className={page==='compounds'?'active':''} onClick={()=>setPage('compounds')}>Compounds</a>
+        <a className={page==='similarity'?'active':''} onClick={()=>setPage('similarity')}>Similarity</a>
+        <a className={page==='cliffs'?'active':''} onClick={()=>setPage('cliffs')}>Activity Cliffs</a>
         <div className="section">Output</div>
         <a className={page==='report'?'active':''} onClick={()=>setPage('report')}>Report</a>
     </div>
@@ -953,6 +957,170 @@ const Report = () => {
     </div>);
 };
 
+// ── Molecule SVG component ───────────────────────────
+const MolSVG = ({ base64svg, width, height }) => {
+    if (!base64svg) return <div style={{width,height,background:'#1e293b',borderRadius:4,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,color:'#475569'}}>No structure</div>;
+    const svg = atob(base64svg);
+    return <div style={{width,height}} dangerouslySetInnerHTML={{__html: svg.replace(/width='[^']*'/, `width='${width}'`).replace(/height='[^']*'/, `height='${height}'`)}} />;
+};
+
+// ── Compounds Page ──────────────────────────────────
+const Compounds = () => {
+    const [compounds, setCompounds] = useState([]);
+    const [filter, setFilter] = useState('');
+    const [detail, setDetail] = useState(null);
+    useEffect(() => { api.get('/chem/compounds').then(setCompounds); }, []);
+    const filtered = filter ? compounds.filter(c => c.scaffold === filter) : compounds;
+    const scaffolds = [...new Set(compounds.map(c => c.scaffold))];
+    return (<div>
+        <div className="page-title">Compounds ({filtered.length})</div>
+        <div className="card">
+            <div className="suggestion-chips" style={{marginBottom:12}}>
+                <div className={`chip ${!filter?'active':''}`} onClick={()=>setFilter('')} style={{background:!filter?'#2563eb':''}}>All ({compounds.length})</div>
+                {scaffolds.map(s => (
+                    <div key={s} className="chip" onClick={()=>setFilter(s)} style={{background:filter===s?(SCAFFOLD_COLORS[s]||'#2563eb')+'':'',
+                        borderColor:SCAFFOLD_COLORS[s]||'#334155'}}>{s} ({compounds.filter(c=>c.scaffold===s).length})</div>
+                ))}
+            </div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
+                {filtered.map(c => (
+                    <div key={c.name} onClick={()=>api.get('/chem/compound/'+c.name).then(setDetail)}
+                         style={{width:220,background:'#0f172a',borderRadius:8,padding:10,border:'1px solid #334155',
+                         borderTop:`3px solid ${SCAFFOLD_COLORS[c.scaffold]||'#38bdf8'}`,cursor:'pointer',transition:'transform 0.1s'}}
+                         onMouseOver={e=>e.currentTarget.style.transform='scale(1.02)'} onMouseOut={e=>e.currentTarget.style.transform='scale(1)'}>
+                        <MolSVG base64svg={c.svg_base64} width={200} height={140}/>
+                        <div style={{fontSize:13,fontWeight:600,marginTop:6}}>{c.name}</div>
+                        <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'#64748b',marginTop:2}}>
+                            <span>{c.scaffold}</span>
+                            {c.pic50 && <span style={{color:c.pic50>7.5?'#34d399':c.pic50>6.5?'#fbbf24':'#f87171'}}>pIC50={c.pic50}</span>}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+        {detail && <div className="card" style={{borderLeft:'4px solid #38bdf8'}}>
+            <div style={{display:'flex',gap:16}}>
+                <MolSVG base64svg={detail.svg_base64} width={300} height={220}/>
+                <div style={{flex:1}}>
+                    <h3 style={{fontSize:18}}>{detail.name}</h3>
+                    <div style={{fontSize:12,color:'#64748b',marginBottom:8}}>SMILES: {detail.smiles}</div>
+                    <div style={{fontSize:14,marginBottom:4}}>Scaffold: <strong style={{color:SCAFFOLD_COLORS[detail.scaffold]||'#38bdf8'}}>{detail.scaffold}</strong></div>
+                    {detail.pic50 && <div style={{fontSize:14}}>pIC50: <strong>{detail.pic50}</strong></div>}
+                    {detail.properties && <div style={{marginTop:12}}>
+                        <h2>Molecular Properties</h2>
+                        <div className="grid" style={{gridTemplateColumns:'repeat(4,1fr)',gap:8,marginTop:8}}>
+                            {Object.entries(detail.properties).map(([k,v]) => (
+                                <div key={k} className="stat" style={{padding:8}}>
+                                    <div className="value" style={{fontSize:18}}>{v}</div>
+                                    <div className="label">{k.replace(/_/g,' ')}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>}
+                </div>
+            </div>
+        </div>}
+    </div>);
+};
+
+// ── Similarity Search Page ──────────────────────────
+const Similarity = () => {
+    const [query, setQuery] = useState('benz_001_F');
+    const [results, setResults] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const search = async () => {
+        setLoading(true);
+        const r = await api.get(`/chem/similar/${query}?top_k=12`);
+        setResults(r); setLoading(false);
+    };
+    useEffect(() => { search(); }, []);
+    return (<div>
+        <div className="page-title">Fingerprint Similarity Search</div>
+        <div className="card">
+            <div className="chat-input">
+                <input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==='Enter'&&search()}
+                       placeholder="Compound name (e.g. benz_001_F)" />
+                <button onClick={search} disabled={loading}>{loading?'...':'Search'}</button>
+            </div>
+            <div className="suggestion-chips">
+                {['benz_001_F','ind_001_H','naph_001_H','quin_001_H','pyr_001_H','bzim_001_H'].map(n => (
+                    <div key={n} className="chip" onClick={()=>{setQuery(n);setTimeout(()=>{api.get(`/chem/similar/${n}?top_k=12`).then(setResults)},50)}}>{n}</div>
+                ))}
+            </div>
+        </div>
+        {results.length > 0 && <div className="card"><h2>Results (sorted by Tanimoto similarity)</h2>
+            <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
+                {results.map((r,i) => (
+                    <div key={r.name} style={{width:200,background:'#0f172a',borderRadius:8,padding:10,
+                        border:`1px solid ${i===0?'#38bdf8':'#334155'}`,borderTop:`3px solid ${SCAFFOLD_COLORS[r.scaffold]||'#38bdf8'}`}}>
+                        <MolSVG base64svg={r.svg_base64} width={180} height={130}/>
+                        <div style={{fontSize:13,fontWeight:600,marginTop:4}}>{r.name}</div>
+                        <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#64748b',marginTop:2}}>
+                            <span>Sim: <strong style={{color:r.similarity>0.8?'#34d399':r.similarity>0.5?'#fbbf24':'#f87171'}}>{(r.similarity*100).toFixed(0)}%</strong></span>
+                            {r.pic50 && <span>pIC50={r.pic50}</span>}
+                        </div>
+                        <ConfBar value={r.similarity}/>
+                    </div>
+                ))}
+            </div>
+        </div>}
+    </div>);
+};
+
+// ── Activity Cliffs Page ────────────────────────────
+const ActivityCliffs = () => {
+    const [cliffs, setCliffs] = useState([]);
+    const [simThresh, setSimThresh] = useState(0.5);
+    const [actThresh, setActThresh] = useState(0.5);
+    const [loading, setLoading] = useState(false);
+    const detect = async () => {
+        setLoading(true);
+        const r = await api.get(`/chem/cliffs?sim_threshold=${simThresh}&act_threshold=${actThresh}`);
+        setCliffs(r); setLoading(false);
+    };
+    useEffect(() => { detect(); }, []);
+    return (<div>
+        <div className="page-title">Activity Cliffs</div>
+        <div className="card">
+            <p style={{color:'#94a3b8',marginBottom:12}}>Compound pairs with high structural similarity but large activity difference — these reveal critical SAR insights.</p>
+            <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:12}}>
+                <label style={{fontSize:12,color:'#64748b'}}>Min similarity:</label>
+                <input type="range" min="0.3" max="0.95" step="0.05" value={simThresh} onChange={e=>setSimThresh(+e.target.value)}/>
+                <span style={{fontSize:13,minWidth:40}}>{(simThresh*100).toFixed(0)}%</span>
+                <label style={{fontSize:12,color:'#64748b',marginLeft:16}}>Min activity delta:</label>
+                <input type="range" min="0.5" max="3" step="0.25" value={actThresh} onChange={e=>setActThresh(+e.target.value)}/>
+                <span style={{fontSize:13,minWidth:50}}>{actThresh} pIC50</span>
+                <button onClick={detect} disabled={loading} style={{marginLeft:8,padding:'6px 16px',background:'#2563eb',color:'white',border:'none',borderRadius:6,cursor:'pointer'}}>
+                    {loading?'...':'Detect'}</button>
+            </div>
+            <div style={{fontSize:12,color:'#64748b'}}>{cliffs.length} activity cliff(s) found</div>
+        </div>
+        {cliffs.map((c,i) => (
+            <div key={i} className="card" style={{borderLeft:'4px solid #f87171'}}>
+                <div style={{display:'flex',gap:16,alignItems:'center'}}>
+                    <div style={{textAlign:'center'}}>
+                        <MolSVG base64svg={c.svg_a} width={180} height={130}/>
+                        <div style={{fontSize:13,fontWeight:600}}>{c.compound_a}</div>
+                        <div style={{fontSize:18,fontWeight:700,color:'#34d399'}}>pIC50={c.pic50_a}</div>
+                    </div>
+                    <div style={{textAlign:'center',minWidth:100}}>
+                        <div style={{fontSize:11,color:'#64748b'}}>Similarity</div>
+                        <div style={{fontSize:20,fontWeight:700,color:'#38bdf8'}}>{(c.similarity*100).toFixed(0)}%</div>
+                        <div style={{fontSize:24,color:'#f87171'}}>↕</div>
+                        <div style={{fontSize:11,color:'#64748b'}}>Activity delta</div>
+                        <div style={{fontSize:20,fontWeight:700,color:'#f87171'}}>Δ{c.activity_delta}</div>
+                    </div>
+                    <div style={{textAlign:'center'}}>
+                        <MolSVG base64svg={c.svg_b} width={180} height={130}/>
+                        <div style={{fontSize:13,fontWeight:600}}>{c.compound_b}</div>
+                        <div style={{fontSize:18,fontWeight:700,color:'#f87171'}}>pIC50={c.pic50_b}</div>
+                    </div>
+                </div>
+            </div>
+        ))}
+    </div>);
+};
+
 // ── Ingest Page ──────────────────────────────────────
 const Ingest = () => {
     const [filePath, setFilePath] = useState('');
@@ -1060,7 +1228,9 @@ const App = () => {
         investigations: () => <Investigations />, artifacts: () => <Artifacts />,
         documents: () => <Documents />, episodes: () => <Episodes />,
         provenance: () => <Provenance />,
-        sar: () => <SAR />, report: () => <Report />, ingest: () => <Ingest />,
+        sar: () => <SAR />, report: () => <Report />,
+        compounds: () => <Compounds />, similarity: () => <Similarity />, cliffs: () => <ActivityCliffs />,
+        ingest: () => <Ingest />,
         conflicts: () => <Conflicts />, "low-confidence": () => <LowConfidence />,
     };
     const renderPage = pageMap[page] || pageMap.dashboard;
