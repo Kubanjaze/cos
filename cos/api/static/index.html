@@ -1127,11 +1127,28 @@ const ActivityCliffs = () => {
 
 // ── Target Profile Page ──────────────────────────────
 const TargetProfile = () => {
+    const [targets, setTargets] = useState([]);
+    const [selected, setSelected] = useState('');
     const [profile, setProfile] = useState(null);
-    useEffect(() => { api.get('/targets/CETP').then(setProfile); }, []);
+    useEffect(() => {
+        api.get('/targets').then(t => {
+            setTargets(t);
+            if (t.length > 0) { setSelected(t[0].name); api.get(`/targets/${t[0].name}`).then(setProfile); }
+        });
+    }, []);
+    const switchTarget = (name) => { setSelected(name); api.get(`/targets/${name}`).then(setProfile); };
     if (!profile) return <div className="loading">Loading target profile...</div>;
     return (<div>
-        <div className="page-title">Target: {profile.target}</div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+            <div className="page-title" style={{marginBottom:0}}>Target: {profile.target}</div>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                {targets.length > 1 && <select value={selected} onChange={e=>switchTarget(e.target.value)}
+                    style={{padding:'8px 12px',background:'#0f172a',color:'#e2e8f0',border:'1px solid #334155',borderRadius:6,fontSize:13}}>
+                    {targets.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+                </select>}
+                {targets.length <= 1 && <div style={{fontSize:12,color:'#64748b'}}>Add more targets via Ingest Data or Import Assay</div>}
+            </div>
+        </div>
         <div className="card" style={{borderLeft:'4px solid #38bdf8'}}>
             <h3>{profile.target}</h3>
             <div style={{fontSize:14,color:'#94a3b8',marginTop:4}}>{profile.definition}</div>
